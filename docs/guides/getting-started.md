@@ -98,6 +98,40 @@ print(f"Fixed code:\n{fix['fixed_code']}")
 print(f"Explanation:\n{fix['explanation']}")
 ```
 
+## Using the Test Scripts
+
+We've included several scripts to help you test the bug detection and automatic PR creation functionality:
+
+### 1. Test Scripts
+
+- `test_buggy_code.py`: A Python file with an intentional bug (division by zero)
+- `test_agent_logger.py`: A script to test the full analysis and fix workflow
+- `test_github_pr.py`: A script to directly test the GitHub PR creation
+
+### 2. Update the API Key
+
+Edit both `test_agent_logger.py` and `test_github_pr.py` and replace `"your_api_key_here"` with your actual API key:
+
+```python
+API_KEY = "your_actual_api_key"
+```
+
+### 3. Run the Test Scripts
+
+To test code analysis and fix generation:
+
+```bash
+python test_agent_logger.py test_buggy_code.py
+```
+
+To test GitHub PR creation (requires GitHub integration):
+
+```bash
+python test_agent_logger.py test_buggy_code.py "yourusername/your-repo"
+```
+
+For more details on the test scripts, see the `TEST_README.md` file in the project root.
+
 ## Next Steps
 
 - Explore the [API Reference](../api/index.md) to learn about all available endpoints

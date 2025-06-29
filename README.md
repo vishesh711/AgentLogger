@@ -151,6 +151,52 @@ docker-compose exec app python scripts/init_db.py
 docker-compose exec app python scripts/generate_api_key.py
 ```
 
+### Running Tests
+
+To run the test suite:
+
+```bash
+# Run all tests
+pytest
+
+# Run tests with verbose output
+pytest -v
+
+# Run tests with coverage report
+pip install pytest-cov
+pytest --cov=app
+
+# Run specific test files
+pytest tests/test_health.py
+```
+
+The test suite uses an in-memory SQLite database for testing, so you don't need to set up a separate test database.
+
+For more details on testing, see the [Testing Guide](docs/development/testing.md).
+
+## Testing the Bug Detection and PR Creation
+
+We've included several scripts to help you test the bug detection and automatic PR creation functionality:
+
+- `test_buggy_code.py`: A Python file with an intentional bug (division by zero)
+- `test_agent_logger.py`: A script to test the full analysis and fix workflow
+- `test_github_pr.py`: A script to directly test the GitHub PR creation
+
+To test the system:
+
+```bash
+# For full analysis and fix workflow
+python test_agent_logger.py test_buggy_code.py
+
+# To also create a GitHub PR
+python test_agent_logger.py test_buggy_code.py "yourusername/your-repo"
+
+# To directly test GitHub PR creation
+python test_github_pr.py "yourusername/your-repo"
+```
+
+See `TEST_README.md` for detailed instructions on using these test scripts.
+
 ## Usage Example
 
 ### Analyze Code for Issues
@@ -228,6 +274,7 @@ Comprehensive documentation is available in the `docs` directory:
 - **Configuration Guide**: [docs/guides/configuration.md](docs/guides/configuration.md)
 - **API Reference**: [docs/api/index.md](docs/api/index.md)
 - **Development Guide**: [docs/development/index.md](docs/development/index.md)
+- **Testing Guide**: [docs/development/testing.md](docs/development/testing.md)
 - **Deployment Guide**: [docs/guides/deployment.md](docs/guides/deployment.md)
 
 ## License
