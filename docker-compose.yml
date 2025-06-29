@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: agentlogger-api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    environment:
+      - POSTGRES_SERVER=db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=agentlogger
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USE_REDIS=true
+      - USE_DOCKER_SANDBOX=true
+    networks:
+      - agentlogger-network
+
+  db:
+    image: postgres:15
+    container_name: agentlogger-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=agentlogger
+    ports:
+      - "5432:5432"
+    networks:
+      - agentlogger-network
+
+  redis:
+    image: redis:7
+    container_name: agentlogger-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - agentlogger-network
+
+networks:
+  agentlogger-network:
+
+volumes:
+  postgres_data: 
