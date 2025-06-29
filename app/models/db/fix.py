@@ -26,6 +26,10 @@ class FixRequest(BaseModel):
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
     user = relationship("User", back_populates="fix_requests")
     
+    # Related analysis request
+    analysis_id = Column(UUID(as_uuid=True), ForeignKey("analysis_requests.id"), nullable=True)
+    analysis = relationship("AnalysisRequest", back_populates="fix_requests")
+    
     # Code to fix
     code = Column(Text, nullable=False)
     language = Column(String, nullable=False)
@@ -35,7 +39,7 @@ class FixRequest(BaseModel):
     # Fix result
     fixed_code = Column(Text, nullable=True)
     explanation = Column(Text, nullable=True)
-    status = Column(String, nullable=False, default="pending")
+    status = Column(Enum(FixStatus), nullable=False, default=FixStatus.PENDING)
     validation_message = Column(Text, nullable=True)
     
     # Timestamps

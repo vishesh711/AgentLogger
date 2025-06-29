@@ -1,7 +1,7 @@
 from typing import List, Dict
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 
@@ -18,6 +18,7 @@ router = APIRouter()
 
 @router.post("/", response_model=FixRequestResponse)
 async def create_fix(
+    request: Request,
     fix_data: FixRequestCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
@@ -28,7 +29,7 @@ async def create_fix(
     The fix will be generated asynchronously in the background.
     """
     # Get user_id from request state (set by the API key middleware)
-    user_id = UUID("00000000-0000-0000-0000-000000000000")  # Placeholder
+    user_id = request.state.user_id
     
     try:
         # Create the fix request
@@ -66,6 +67,7 @@ async def get_fix(
 
 @router.get("/", response_model=List[FixRequestResponse])
 async def get_user_fixes(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
@@ -74,7 +76,7 @@ async def get_user_fixes(
     Get all fix requests for the current user
     """
     # Get user_id from request state (set by the API key middleware)
-    user_id = UUID("00000000-0000-0000-0000-000000000000")  # Placeholder
+    user_id = request.state.user_id
     
     return await get_fix_requests_by_user(db, user_id, skip, limit)
 

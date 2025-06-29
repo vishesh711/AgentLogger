@@ -1,6 +1,6 @@
-# Testing AgentLogger
+# Integration Testing for AgentLogger
 
-This README explains how to test the AgentLogger's bug detection and automatic PR creation functionality.
+This README explains how to run integration tests for the AgentLogger's bug detection and automatic PR creation functionality.
 
 ## Prerequisites
 
@@ -10,9 +10,10 @@ This README explains how to test the AgentLogger's bug detection and automatic P
 
 ## Files
 
-- `test_buggy_code.py`: A Python file with an intentional bug (division by zero)
-- `test_agent_logger.py`: A script to test the AgentLogger API
-- `test_github_pr.py`: A script to directly test the GitHub PR creation functionality
+- `tests/integration/test_buggy_code.py`: A Python file with an intentional bug (division by zero)
+- `tests/integration/test_agent_logger.py`: A script to test the AgentLogger API
+- `tests/integration/test_github_pr.py`: A script to directly test the GitHub PR creation functionality
+- `tests/integration/test_agent_debug.py`: A script to test the agent-based debugging system
 
 ## Steps to Test
 
@@ -26,7 +27,7 @@ python scripts/generate_api_key.py
 
 ### 2. Update the Test Scripts
 
-Edit both `test_agent_logger.py` and `test_github_pr.py` and replace `"your_api_key_here"` with your actual API key:
+Edit both `tests/integration/test_agent_logger.py` and `tests/integration/test_github_pr.py` and replace `"your_api_key_here"` with your actual API key:
 
 ```python
 API_KEY = "your_actual_api_key"
@@ -37,7 +38,7 @@ API_KEY = "your_actual_api_key"
 To test code analysis and fix generation:
 
 ```bash
-python test_agent_logger.py test_buggy_code.py
+python tests/integration/test_agent_logger.py tests/integration/test_buggy_code.py
 ```
 
 This will:
@@ -51,7 +52,7 @@ This will:
 To test the full flow including GitHub PR creation, provide your GitHub repository name:
 
 ```bash
-python test_agent_logger.py test_buggy_code.py "yourusername/your-repo"
+python tests/integration/test_agent_logger.py tests/integration/test_buggy_code.py "yourusername/your-repo"
 ```
 
 ### 5. Test Direct GitHub PR Creation
@@ -59,8 +60,18 @@ python test_agent_logger.py test_buggy_code.py "yourusername/your-repo"
 To directly test just the GitHub PR creation functionality:
 
 ```bash
-python test_github_pr.py "yourusername/your-repo" "fix-branch-name"
+python tests/integration/test_github_pr.py "yourusername/your-repo" "fix-branch-name"
 ```
+
+### 6. Test Agent-Based Debugging
+
+To test the agent-based debugging system:
+
+```bash
+python tests/integration/test_agent_debug.py
+```
+
+Note: This test requires the API server to be running at localhost:8000.
 
 The branch name is optional and will default to "fix-division-by-zero" if not provided.
 

@@ -29,7 +29,7 @@ class FixRequestBase(BaseModel):
 # Schema for creating a new fix request
 class FixRequestCreate(FixRequestBase):
     """Schema for creating a fix request"""
-    pass
+    analysis_id: Optional[UUID] = Field(None, description="ID of the analysis request this fix is for")
 
 
 # Schema for returning a fix request
@@ -37,7 +37,8 @@ class FixRequestResponse(FixRequestBase):
     """Schema for fix request response"""
     id: str = Field(..., description="The ID of the fix request")
     user_id: str = Field(..., description="The ID of the user who created the request")
-    status: str = Field(..., description="Status of the fix request")
+    analysis_id: Optional[UUID] = Field(None, description="ID of the analysis request this fix is for")
+    status: FixStatus = Field(..., description="Status of the fix request")
     fixed_code: Optional[str] = Field(None, description="The fixed code")
     explanation: Optional[str] = Field(None, description="Explanation of the fix")
     validation_message: Optional[str] = Field(None, description="Validation message for the fix")

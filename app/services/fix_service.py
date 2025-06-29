@@ -37,7 +37,8 @@ async def create_fix_request(
         language=fix_request.language,
         error_message=fix_request.error_message,
         context=fix_request.context,
-        status="pending"
+        analysis_id=fix_request.analysis_id,
+        status=FixStatus.PENDING
     )
     
     db.add(db_fix_request)
@@ -70,6 +71,42 @@ async def get_user_fix_requests(db: Session, user_id: str, skip: int = 0, limit:
     
     return [FixRequestResponse.model_validate(fr) for fr in db_fix_requests]
 
+async def get_fix_requests_by_user(db: Session, user_id: UUID, skip: int = 0, limit: int = 100) -> List[FixRequestResponse]:
+    """
+    Get all fix requests for a user
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        
+    Returns:
+        List of fix request responses
+    """
+    db_fix_requests = db.query(FixRequest).filter(
+        FixRequest.user_id == user_id
+    ).offset(skip).limit(limit).all()
+    
+    return [FixRequestResponse.model_validate(fr) for fr in db_fix_requests]
+
+async def get_fix_requests_by_analysis(db: Session, analysis_id: UUID) -> List[FixRequestResponse]:
+    """
+    Get all fix requests for a specific analysis
+    
+    Args:
+        db: Database session
+        analysis_id: Analysis ID
+        
+    Returns:
+        List of fix request responses
+    """
+    db_fix_requests = db.query(FixRequest).filter(
+        FixRequest.analysis_id == analysis_id
+    ).all()
+    
+    return [FixRequestResponse.model_validate(fr) for fr in db_fix_requests]
+
 async def process_fix_request(db: Session, fix_id: str) -> None:
     """
     Process a fix request by generating a fix using AI
@@ -80,7 +117,7 @@ async def process_fix_request(db: Session, fix_id: str) -> None:
         return
     
     # Update status
-    db_fix_request.status = "processing"
+    db_fix_request.status = FixStatus.PROCESSING
     db.commit()
     
     try:
@@ -102,7 +139,7 @@ async def process_fix_request(db: Session, fix_id: str) -> None:
         # Update the fix request
         db_fix_request.fixed_code = fix_result["fixed_code"]
         db_fix_request.explanation = fix_result["explanation"]
-        db_fix_request.status = "completed" if is_valid else "failed"
+        db_fix_request.status = FixStatus.COMPLETED if is_valid else FixStatus.FAILED
         db_fix_request.validation_message = validation_message
         db_fix_request.completed_at = datetime.utcnow()
         
@@ -110,7 +147,7 @@ async def process_fix_request(db: Session, fix_id: str) -> None:
         
     except Exception as e:
         # Handle errors
-        db_fix_request.status = "failed"
+        db_fix_request.status = FixStatus.FAILED
         db_fix_request.validation_message = f"Error processing fix: {str(e)}"
         db.commit()
 

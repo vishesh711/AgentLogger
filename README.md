@@ -188,7 +188,7 @@ For more details on testing, see the [Testing Guide](docs/development/testing.md
 
 ## Testing the Bug Detection and PR Creation
 
-We've included several scripts to help you test the bug detection and automatic PR creation functionality:
+We've included several scripts in the `tests/integration` directory to help you test the bug detection and automatic PR creation functionality:
 
 - `test_buggy_code.py`: A Python file with an intentional bug (division by zero)
 - `test_agent_logger.py`: A script to test the full analysis and fix workflow
@@ -199,19 +199,19 @@ To test the system:
 
 ```bash
 # For full analysis and fix workflow
-python test_agent_logger.py test_buggy_code.py
+python tests/integration/test_agent_logger.py tests/integration/test_buggy_code.py
 
 # To also create a GitHub PR
-python test_agent_logger.py test_buggy_code.py "yourusername/your-repo"
+python tests/integration/test_agent_logger.py tests/integration/test_buggy_code.py "yourusername/your-repo"
 
 # To directly test GitHub PR creation
-python test_github_pr.py "yourusername/your-repo"
+python tests/integration/test_github_pr.py "yourusername/your-repo"
 
 # To test the agent-based debugging system
-python test_agent_debug.py
+python tests/integration/test_agent_debug.py
 ```
 
-See `TEST_README.md` for detailed instructions on using these test scripts.
+See `tests/integration/README.md` for detailed instructions on using these test scripts.
 
 ## Usage Example
 

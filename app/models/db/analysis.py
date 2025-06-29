@@ -37,6 +37,7 @@ class AnalysisRequest(BaseModel):
     
     # Relationships
     user = relationship("User", back_populates="analysis_requests")
+    fix_requests = relationship("FixRequest", back_populates="analysis", cascade="all, delete-orphan")
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

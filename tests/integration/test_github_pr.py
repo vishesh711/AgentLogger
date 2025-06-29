@@ -89,21 +89,26 @@ def create_github_pr(code, repo, branch="fix-branch"):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python test_github_pr.py <github_repo> [branch_name]")
+        print("Usage: python tests/integration/test_github_pr.py <github_repo> [branch_name]")
         sys.exit(1)
     
     repo = sys.argv[1]
     branch = sys.argv[2] if len(sys.argv) > 2 else "fix-division-by-zero"
     
-    # Buggy code to fix
+    # Fixed code
     code = """def divide_numbers(a, b):
-    # Bug: No check for division by zero
+    # Fixed: Added check for division by zero
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
     return a / b
 
 def main():
-    # This will cause a ZeroDivisionError
-    result = divide_numbers(10, 0)
-    print(f"Result: {result}")
+    # This will now handle the division by zero case
+    try:
+        result = divide_numbers(10, 0)
+        print(f"Result: {result}")
+    except ValueError as e:
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()"""

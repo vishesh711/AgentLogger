@@ -129,7 +129,7 @@ def create_github_pr(fix_id, repo, branch="fix-branch"):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python test_agent_logger.py <file_path> [github_repo]")
+        print("Usage: python tests/integration/test_agent_logger.py <file_path> [github_repo]")
         sys.exit(1)
     
     file_path = sys.argv[1]

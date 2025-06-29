@@ -63,6 +63,23 @@ class GroqClient:
                 raise Exception(f"Groq API error: {response.status_code} - {response.text}")
             
             return response.json()
+    
+    async def generate_text(self, prompt: str, max_tokens: int = 1000, temperature: float = 0.7) -> str:
+        """
+        Generate text from a prompt and return just the content string
+        
+        This is an alias for generate_completion that returns just the text content
+        
+        Args:
+            prompt: The prompt to generate text from
+            max_tokens: Maximum number of tokens to generate
+            temperature: Temperature for text generation (higher = more random)
+            
+        Returns:
+            The generated text content
+        """
+        response = await self.generate_completion(prompt, max_tokens, temperature)
+        return response["choices"][0]["message"]["content"]
             
     async def analyze_code(self, code: str, language: str) -> List[CodeIssue]:
         """
@@ -314,7 +331,8 @@ async def get_fix_from_groq(
         # Find JSON block in the response if it's not pure JSON
         if not content.strip().startswith("{"):
             import re
-            json_match = re.search(r"```json\s*([\s\S]*?)\s*```", content)
+            # First try to find JSON block in code fence
+            json_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", content)
             if json_match:
                 content = json_match.group(1)
             else:
@@ -323,11 +341,18 @@ async def get_fix_from_groq(
                 if json_match:
                     content = json_match.group(0)
         
-        result = json.loads(content)
-        
-        # Ensure the result has the expected structure
-        if "fixed_code" not in result or "explanation" not in result:
-            raise ValueError("Invalid response format from Groq API")
+        try:
+            result = json.loads(content)
+            
+            # Ensure the result has the expected structure
+            if "fixed_code" not in result or "explanation" not in result:
+                raise ValueError("Invalid response format from Groq API")
+        except json.JSONDecodeError:
+            # If JSON parsing fails, create a fallback response
+            return {
+                "fixed_code": code,
+                "explanation": "Failed to parse the AI response. The original code is returned unchanged."
+            }
         
         return result
         

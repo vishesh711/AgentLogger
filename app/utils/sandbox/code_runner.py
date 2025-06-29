@@ -6,6 +6,39 @@ from typing import Dict, Any, Optional
 
 from app.core.config import settings
 
+class CodeRunner:
+    """
+    Class for running code in a sandbox environment
+    """
+    def __init__(self, use_docker: bool = None):
+        """
+        Initialize the CodeRunner
+        
+        Args:
+            use_docker: Whether to use Docker for sandboxing (defaults to settings.USE_DOCKER_SANDBOX)
+        """
+        self.use_docker = use_docker if use_docker is not None else settings.USE_DOCKER_SANDBOX
+    
+    async def run_code(self, code: str, language: str, timeout: int = 30) -> Dict[str, Any]:
+        """
+        Run code in a sandbox environment and return the result
+        
+        Args:
+            code: The code to run
+            language: The programming language of the code
+            timeout: Maximum execution time in seconds
+            
+        Returns:
+            Dict with execution results including:
+            - success: Whether execution was successful
+            - output: Output from the execution (if successful)
+            - error: Error message (if unsuccessful)
+        """
+        if self.use_docker:
+            return await run_in_docker(code, language, timeout)
+        else:
+            return await run_locally(code, language, timeout)
+
 async def run_code_in_sandbox(
     code: str, 
     language: str, 

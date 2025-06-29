@@ -32,4 +32,7 @@ def get_parser_for_language(language: str) -> BaseParser:
     
     # Fall back to a default parser for unknown languages
     # In a real implementation, you might want to raise an error instead
-    return PythonParser()  # Default to Python parser 
+    return PythonParser()  # Default to Python parser
+
+# Alias for backward compatibility
+get_parser = get_parser_for_language 

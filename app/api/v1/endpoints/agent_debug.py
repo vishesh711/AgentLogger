@@ -14,7 +14,7 @@ from app.core.config import settings
 router = APIRouter()
 
 # Initialize the agent system
-groq_client = GroqClient(api_key=settings.GROQ_API_KEY, model=settings.GROQ_MODEL)
+groq_client = GroqClient(api_key=settings.GROQ_API_KEY)
 agent_system = AgentSystem(llm_client=groq_client)
 agent_system.initialize_agents()
 
