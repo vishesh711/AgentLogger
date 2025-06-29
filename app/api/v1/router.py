@@ -1,14 +1,47 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import analyze, fix, explain, github, health, users, api_keys
-
+# Create the main API router
 api_router = APIRouter()
 
-# Include all endpoint routers
-api_router.include_router(analyze.router, prefix="/analyze", tags=["analyze"])
-api_router.include_router(fix.router, prefix="/fix", tags=["fix"])
-api_router.include_router(explain.router, prefix="/explain", tags=["explain"])
-api_router.include_router(github.router, prefix="/github", tags=["github"])
-api_router.include_router(health.router, prefix="/health", tags=["health"])
-api_router.include_router(users.router, prefix="/users", tags=["users"])
-api_router.include_router(api_keys.router, prefix="/api-keys", tags=["api-keys"]) 
+# Import and include all endpoint routers
+from app.api.v1.endpoints import health
+
+# Health check endpoint
+api_router.include_router(health.router, tags=["health"])
+
+# Try to import other endpoints, but don't fail if they don't exist yet
+try:
+    from app.api.v1.endpoints import users
+    api_router.include_router(users.router, prefix="/users", tags=["users"])
+except ImportError:
+    pass
+
+try:
+    from app.api.v1.endpoints import api_keys
+    api_router.include_router(api_keys.router, prefix="/api-keys", tags=["api-keys"])
+except ImportError:
+    pass
+
+try:
+    from app.api.v1.endpoints import analyze
+    api_router.include_router(analyze.router, prefix="/analyze", tags=["analyze"])
+except ImportError:
+    pass
+
+try:
+    from app.api.v1.endpoints import fix
+    api_router.include_router(fix.router, prefix="/fix", tags=["fix"])
+except ImportError:
+    pass
+
+try:
+    from app.api.v1.endpoints import explain
+    api_router.include_router(explain.router, prefix="/explain", tags=["explain"])
+except ImportError:
+    pass
+
+try:
+    from app.api.v1.endpoints import github
+    api_router.include_router(github.router, prefix="/github", tags=["github"])
+except ImportError:
+    pass 

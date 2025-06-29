@@ -1,20 +1,24 @@
-from typing import Generator
-
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 from app.core.config import settings
 
-engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
+# Create SQLAlchemy engine
+engine = create_engine(
+    settings.SQLALCHEMY_DATABASE_URI,
+    pool_pre_ping=True,  # Test connections before using them
+)
+
+# Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Create base class for models
 Base = declarative_base()
 
-
-def get_db() -> Generator:
+def get_db() -> Session:
     """
-    Dependency function that yields db sessions
+    Dependency for FastAPI to get a database session
     """
     db = SessionLocal()
     try:

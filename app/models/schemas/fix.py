@@ -19,32 +19,32 @@ class GitHubPRRequest(BaseModel):
 
 # Base Fix Request Schema
 class FixRequestBase(BaseModel):
-    issue_id: str = Field(..., description="ID of the issue to fix")
-    create_pr: bool = Field(False, description="Whether to create a GitHub PR with the fix")
-    github_pr: Optional[GitHubPRRequest] = Field(None, description="GitHub PR details if create_pr is True")
+    """Base schema for fix requests"""
+    code: str = Field(..., description="The code with errors to fix")
+    language: str = Field(..., description="The programming language of the code")
+    error_message: Optional[str] = Field(None, description="The error message to fix")
+    context: Optional[str] = Field(None, description="Additional context for the fix")
 
 
 # Schema for creating a new fix request
 class FixRequestCreate(FixRequestBase):
-    analysis_id: UUID = Field(..., description="ID of the analysis request")
+    """Schema for creating a fix request"""
+    pass
 
 
 # Schema for returning a fix request
 class FixRequestResponse(FixRequestBase):
-    id: UUID
-    status: FixStatus
-    fixed_code: Optional[str] = None
-    explanation: Optional[str] = None
-    error: Optional[str] = None
-    pr_created: bool
-    pr_url: Optional[str] = None
-    user_id: UUID
-    analysis_id: UUID
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
+    """Schema for fix request response"""
+    id: str = Field(..., description="The ID of the fix request")
+    user_id: str = Field(..., description="The ID of the user who created the request")
+    status: str = Field(..., description="Status of the fix request")
+    fixed_code: Optional[str] = Field(None, description="The fixed code")
+    explanation: Optional[str] = Field(None, description="Explanation of the fix")
+    validation_message: Optional[str] = Field(None, description="Validation message for the fix")
+    created_at: datetime = Field(..., description="When the request was created")
+    completed_at: Optional[datetime] = Field(None, description="When the request was completed")
+    
+    model_config = {"from_attributes": True}
 
 
 # Schema for fix result
@@ -54,4 +54,13 @@ class FixResult(BaseModel):
     fixed_code: Optional[str] = None
     explanation: Optional[str] = None
     error: Optional[str] = None
-    pr_url: Optional[str] = None 
+    pr_url: Optional[str] = None
+
+
+# Schema for updating a fix request
+class FixRequestUpdate(BaseModel):
+    """Schema for updating a fix request"""
+    fixed_code: Optional[str] = Field(None, description="The fixed code")
+    explanation: Optional[str] = Field(None, description="Explanation of the fix")
+    status: Optional[str] = Field(None, description="Status of the fix request")
+    validation_message: Optional[str] = Field(None, description="Validation message for the fix") 

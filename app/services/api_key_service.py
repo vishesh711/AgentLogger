@@ -1,28 +1,66 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 from uuid import UUID
+import secrets
 
 from sqlalchemy.orm import Session
 
 from app.models.db.api_key import ApiKey
-from app.models.schemas.api_key import ApiKeyCreate, ApiKeyUpdate
+from app.models.db.user import User
+from app.models.schemas.api_key import ApiKeyCreate, ApiKeyResponse
 
 
-async def create_api_key(db: Session, api_key_data: ApiKeyCreate) -> ApiKey:
+async def create_api_key(
+    db: Session, 
+    user_id: str, 
+    api_key_data: ApiKeyCreate
+) -> tuple[ApiKeyResponse, str]:
     """
     Create a new API key for a user
+    
+    Args:
+        db: Database session
+        user_id: User ID to create the key for
+        api_key_data: API key data
+        
+    Returns:
+        Tuple of (API key response, raw API key)
     """
+    # Generate a secure random API key
+    raw_api_key = secrets.token_urlsafe(32)
+    
+    # Set expiration date if provided
+    expires_at = None
+    if api_key_data.expires_in_days:
+        expires_at = datetime.utcnow() + timedelta(days=api_key_data.expires_in_days)
+    
+    # Create the API key
     db_api_key = ApiKey(
-        key=ApiKey.generate_key(),
+        key=raw_api_key,
         name=api_key_data.name,
-        is_active=api_key_data.is_active,
-        expires_at=api_key_data.expires_at or ApiKey.generate_expiry(),
-        user_id=api_key_data.user_id,
+        description=api_key_data.description,
+        user_id=user_id,
+        expires_at=expires_at
     )
+    
     db.add(db_api_key)
     db.commit()
     db.refresh(db_api_key)
-    return db_api_key
+    
+    # Convert to response model
+    response = ApiKeyResponse(
+        id=db_api_key.id,
+        name=db_api_key.name,
+        description=db_api_key.description,
+        is_active=db_api_key.is_active,
+        created_at=db_api_key.created_at,
+        expires_at=db_api_key.expires_at,
+        user_id=db_api_key.user_id
+    )
+    
+    # Return both the response and the raw key
+    # The raw key will only be shown once to the user
+    return response, raw_api_key
 
 
 async def get_api_key(db: Session, api_key_id: UUID) -> Optional[ApiKey]:
@@ -39,65 +77,84 @@ async def get_api_key_by_key(db: Session, key: str) -> Optional[ApiKey]:
     return db.query(ApiKey).filter(ApiKey.key == key).first()
 
 
-async def get_api_keys_by_user(db: Session, user_id: UUID) -> List[ApiKey]:
+async def get_api_keys(db: Session, user_id: str) -> list[ApiKeyResponse]:
     """
     Get all API keys for a user
-    """
-    return db.query(ApiKey).filter(ApiKey.user_id == user_id).all()
-
-
-async def update_api_key(db: Session, api_key_id: UUID, api_key_data: ApiKeyUpdate) -> Optional[ApiKey]:
-    """
-    Update an API key
-    """
-    db_api_key = await get_api_key(db, api_key_id)
-    if not db_api_key:
-        return None
     
-    update_data = api_key_data.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(db_api_key, field, value)
+    Args:
+        db: Database session
+        user_id: User ID to get keys for
+        
+    Returns:
+        List of API key responses
+    """
+    db_api_keys = db.query(ApiKey).filter(ApiKey.user_id == user_id).all()
     
-    db.commit()
-    db.refresh(db_api_key)
-    return db_api_key
+    return [
+        ApiKeyResponse(
+            id=key.id,
+            name=key.name,
+            description=key.description,
+            is_active=key.is_active,
+            created_at=key.created_at,
+            expires_at=key.expires_at,
+            user_id=key.user_id
+        )
+        for key in db_api_keys
+    ]
 
 
-async def delete_api_key(db: Session, api_key_id: UUID) -> bool:
+async def revoke_api_key(db: Session, key_id: str, user_id: str) -> bool:
     """
-    Delete an API key
+    Revoke an API key
+    
+    Args:
+        db: Database session
+        key_id: API key ID to revoke
+        user_id: User ID to verify ownership
+        
+    Returns:
+        True if the key was revoked, False if not found or not owned by the user
     """
-    db_api_key = await get_api_key(db, api_key_id)
+    db_api_key = db.query(ApiKey).filter(
+        ApiKey.id == key_id,
+        ApiKey.user_id == user_id
+    ).first()
+    
     if not db_api_key:
         return False
     
-    db.delete(db_api_key)
+    db_api_key.is_active = False
     db.commit()
+    
     return True
 
 
-async def update_last_used(db: Session, api_key: ApiKey) -> None:
-    """
-    Update the last_used_at timestamp for an API key
-    """
-    api_key.last_used_at = datetime.utcnow()
-    db.commit()
-
-
-async def verify_api_key_service(api_key: str) -> Optional[UUID]:
+async def verify_api_key_service(db: Session, api_key: str) -> Optional[str]:
     """
     Verify an API key and return the user ID if valid
     
-    This function is used by the API key middleware
+    Args:
+        db: Database session
+        api_key: API key to verify
+        
+    Returns:
+        User ID if the key is valid, None otherwise
     """
-    # This is a placeholder for the actual implementation
-    # In a real implementation, this would check the database
-    # For now, we'll just return a dummy user ID if the key is not empty
-    if api_key and len(api_key) > 10:
-        # In the real implementation, we would:
-        # 1. Get the API key from the database
-        # 2. Check if it's active and not expired
-        # 3. Update the last_used_at timestamp
-        # 4. Return the user_id
-        return UUID("00000000-0000-0000-0000-000000000000")
-    return None 
+    db_api_key = db.query(ApiKey).filter(
+        ApiKey.key == api_key,
+        ApiKey.is_active == True
+    ).first()
+    
+    if not db_api_key:
+        return None
+    
+    # Check if the key has expired
+    if db_api_key.expires_at and db_api_key.expires_at < datetime.utcnow():
+        return None
+    
+    # Update last used timestamp
+    db_api_key.last_used_at = datetime.utcnow()
+    db.commit()
+    
+    return db_api_key.user_id 

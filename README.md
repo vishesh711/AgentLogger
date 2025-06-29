@@ -29,6 +29,7 @@ AgentLogger/
 │       └── sandbox/        # Code execution sandbox
 ├── tests/                  # Test suite
 ├── alembic/                # Database migrations
+├── docs/                   # Documentation
 ├── .env.sample             # Sample environment variables
 ├── requirements.txt        # Python dependencies
 └── README.md               # Project documentation
@@ -70,51 +71,85 @@ AgentLogger/
 - `PUT /api/v1/api-keys/{api_key_id}`: Update API key
 - `DELETE /api/v1/api-keys/{api_key_id}`: Delete an API key
 
-## Getting Started
+## Running the Application
 
 ### Prerequisites
 
 - Python 3.11+
-- Docker (for sandbox execution)
-- PostgreSQL
+- PostgreSQL 13+
+- Docker (for sandbox execution, optional)
 - Redis (optional, for caching)
 
-### Installation
+### Quick Start
 
-1. Clone the repository
+1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/agentlogger-api
-cd agentlogger-api
+git clone https://github.com/yourusername/agentlogger
+cd agentlogger
 ```
 
-2. Create and activate virtual environment
+2. **Create and activate virtual environment**
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install dependencies
+3. **Install dependencies**
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Set up environment variables
+4. **Set up environment variables**
 ```bash
-cp .env.sample .env
-# Edit .env with your API keys and configuration
+cp setup_groq_key.txt .env
+# Edit .env with your Groq API key and other configuration
 ```
 
-5. Initialize the database
+5. **Set up the database**
 ```bash
+# Make sure PostgreSQL is running
+# Create the database
+createdb agentlogger
+
+# Run database migrations
 alembic upgrade head
+
+# Initialize the database
+python scripts/init_db.py
 ```
 
-6. Start the development server
+6. **Generate an API key for testing**
+```bash
+python scripts/generate_api_key.py
+# This will output an API key that you can use to access the API
+```
+
+7. **Start the development server**
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-7. Visit the API documentation at http://localhost:8000/docs
+8. **Access the API documentation**
+   - Open your browser and go to http://localhost:8000/docs
+   - Use the API key generated in step 6 to authorize (click the "Authorize" button)
+
+### Docker Setup
+
+You can also run the application using Docker:
+
+```bash
+# Build and start the containers
+docker-compose up -d
+
+# Run database migrations
+docker-compose exec app alembic upgrade head
+
+# Initialize the database
+docker-compose exec app python scripts/init_db.py
+
+# Generate an API key
+docker-compose exec app python scripts/generate_api_key.py
+```
 
 ## Usage Example
 
@@ -123,7 +158,7 @@ uvicorn app.main:app --reload --port 8000
 ```python
 import requests
 
-api_key = "your_api_key"
+api_key = "your_api_key"  # Use the API key generated earlier
 headers = {"X-API-Key": api_key}
 
 code = """
@@ -140,7 +175,7 @@ response = requests.post(
     json={"language": "python", "code": code}
 )
 
-analysis_id = response.json()["id"]
+analysis_id = response.json()["data"]["id"]
 ```
 
 ### Get Analysis Results
@@ -151,7 +186,7 @@ response = requests.get(
     headers=headers
 )
 
-issues = response.json()["issues"]
+issues = response.json()["data"]["issues"]
 for issue in issues:
     print(f"Issue: {issue['message']}")
 ```
@@ -168,7 +203,7 @@ response = requests.post(
     }
 )
 
-fix_id = response.json()["id"]
+fix_id = response.json()["data"]["id"]
 ```
 
 ### Get Fix Results
@@ -179,10 +214,21 @@ response = requests.get(
     headers=headers
 )
 
-fix = response.json()
+fix = response.json()["data"]
 print(f"Fixed code:\n{fix['fixed_code']}")
 print(f"Explanation:\n{fix['explanation']}")
 ```
+
+## Documentation
+
+Comprehensive documentation is available in the `docs` directory:
+
+- **Getting Started**: [docs/guides/getting-started.md](docs/guides/getting-started.md)
+- **Installation Guide**: [docs/guides/installation.md](docs/guides/installation.md)
+- **Configuration Guide**: [docs/guides/configuration.md](docs/guides/configuration.md)
+- **API Reference**: [docs/api/index.md](docs/api/index.md)
+- **Development Guide**: [docs/development/index.md](docs/development/index.md)
+- **Deployment Guide**: [docs/guides/deployment.md](docs/guides/deployment.md)
 
 ## License
 

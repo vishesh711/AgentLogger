@@ -1,3 +1,4 @@
+import os
 import json
 from typing import Any, Dict, List, Optional
 
@@ -8,29 +9,61 @@ from app.models.schemas.analysis import CodeIssue
 
 
 class GroqClient:
-    """Client for Groq LLM API"""
-    
+    """
+    Client for interacting with Groq LLM API
+    """
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or settings.GROQ_API_KEY
         self.model = settings.GROQ_MODEL
         self.base_url = "https://api.groq.com/openai/v1"
-        self.headers = {
+        
+        if not self.api_key:
+            raise ValueError("Groq API key not provided")
+    
+    async def generate_completion(
+        self, 
+        prompt: str, 
+        max_tokens: int = 1000,
+        temperature: float = 0.7,
+        system_message: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate a completion using the Groq API
+        """
+        headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
-    
-    async def _call_api(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Make a request to the Groq API"""
+        
+        messages = []
+        
+        # Add system message if provided
+        if system_message:
+            messages.append({"role": "system", "content": system_message})
+        
+        # Add user message
+        messages.append({"role": "user", "content": prompt})
+        
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature
+        }
+        
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{self.base_url}/{endpoint}",
-                headers=self.headers,
+                f"{self.base_url}/chat/completions",
+                headers=headers,
                 json=payload,
                 timeout=60.0
             )
-            response.raise_for_status()
+            
+            if response.status_code != 200:
+                raise Exception(f"Groq API error: {response.status_code} - {response.text}")
+            
             return response.json()
-    
+            
     async def analyze_code(self, code: str, language: str) -> List[CodeIssue]:
         """
         Analyze code for bugs and issues
@@ -106,6 +139,28 @@ class GroqClient:
         response = await self._call_api("chat/completions", payload)
         return response["choices"][0]["message"]["content"]
     
+    async def _call_api(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Call the Groq API
+        """
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/{endpoint}",
+                headers=headers,
+                json=payload,
+                timeout=60.0
+            )
+            
+            if response.status_code != 200:
+                raise Exception(f"Groq API error: {response.status_code} - {response.text}")
+            
+            return response.json()
+    
     def _get_analysis_prompt(self, code: str, language: str) -> str:
         """
         Generate the prompt for code analysis
@@ -122,32 +177,22 @@ class GroqClient:
         2. Logical bugs
         3. Performance issues
         4. Security vulnerabilities
-        5. Best practice violations
+        5. Code style issues
         
-        For each issue, provide:
-        - A unique ID
-        - Issue type
-        - Severity (critical, high, medium, low)
-        - Description of the problem
-        - Line numbers where the issue occurs
-        - A code snippet showing the issue
-        - Suggestions for fixing the issue
-        
-        Format your response as a JSON object with an "issues" array containing each issue.
-        Example format:
+        Return your analysis as a JSON object with the following structure:
         {{
             "issues": [
                 {{
-                    "id": "ISSUE-1",
-                    "type": "security_vulnerability",
-                    "severity": "high",
-                    "message": "SQL injection vulnerability in query construction",
-                    "line_start": 15,
-                    "line_end": 17,
-                    "column_start": 10,
-                    "column_end": 52,
-                    "code_snippet": "query = f'SELECT * FROM users WHERE id = {{user_input}}'",
-                    "fix_suggestions": ["Use parameterized queries instead of string interpolation"]
+                    "id": "unique-id-1",
+                    "type": "issue-type",
+                    "severity": "high|medium|low",
+                    "message": "Description of the issue",
+                    "line_start": 10,
+                    "line_end": 12,
+                    "column_start": 5,
+                    "column_end": 20,
+                    "code_snippet": "problematic code",
+                    "fix_suggestions": ["suggestion 1", "suggestion 2"]
                 }}
             ]
         }}
@@ -155,7 +200,7 @@ class GroqClient:
     
     def _get_fix_prompt(self, code: str, language: str, issue: CodeIssue) -> str:
         """
-        Generate the prompt for fixing an issue
+        Generate the prompt for fixing a specific issue
         """
         return f"""
         Fix the following issue in this {language} code:
@@ -164,28 +209,21 @@ class GroqClient:
         {code}
         ```
         
-        Issue details:
-        - ID: {issue.id}
+        Issue:
         - Type: {issue.type}
-        - Severity: {issue.severity}
         - Message: {issue.message}
-        - Location: Lines {issue.line_start} to {issue.line_end or issue.line_start}
+        - Line: {issue.line_start}
         
-        Please provide:
-        1. The complete fixed code
-        2. A clear explanation of the changes made
-        
-        Format your response as a JSON object with "fixed_code" and "explanation" fields.
-        Example format:
+        Return your fix as a JSON object with the following structure:
         {{
-            "fixed_code": "def example():\\n    return 'fixed code here'",
-            "explanation": "The issue was fixed by..."
+            "fixed_code": "the complete fixed code",
+            "explanation": "explanation of what was wrong and how you fixed it"
         }}
         """
     
     def _get_error_explanation_prompt(self, error_message: str, code: str, language: str) -> str:
         """
-        Generate the prompt for error explanation
+        Generate the prompt for explaining an error message
         """
         return f"""
         Explain the following error message in simple terms:
@@ -202,8 +240,100 @@ class GroqClient:
         
         Please provide:
         1. A simple explanation of what the error means
-        2. The likely cause of the error in this specific code
-        3. How to fix the error
+        2. The likely cause of the error
+        3. How to fix it
+        """
+
+
+async def get_fix_from_groq(
+    code: str,
+    language: str,
+    error_message: Optional[str] = None,
+    context: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Get a fix for code using Groq LLM
+    """
+    client = GroqClient()
+    
+    system_message = """
+    You are an expert programmer tasked with fixing code errors.
+    Analyze the code and error message provided, then generate a fixed version of the code.
+    Also provide a clear explanation of what was wrong and how you fixed it.
+    Return your response in JSON format with the following structure:
+    {
+        "fixed_code": "the complete fixed code",
+        "explanation": "detailed explanation of the issues and fixes"
+    }
+    """
+    
+    prompt = f"""
+    I need help fixing this {language} code:
+    
+    ```{language}
+    {code}
+    ```
+    
+    """
+    
+    if error_message:
+        prompt += f"""
+        Error message:
+        ```
+        {error_message}
+        ```
+        """
+    
+    if context:
+        prompt += f"""
+        Additional context:
+        {context}
+        """
+    
+    prompt += """
+    Please provide the fixed code and an explanation of what was wrong and how you fixed it.
+    Return your response in JSON format with the following structure:
+    {
+        "fixed_code": "the complete fixed code",
+        "explanation": "detailed explanation of the issues and fixes"
+    }
+    """
+    
+    try:
+        response = await client.generate_completion(
+            prompt=prompt,
+            system_message=system_message,
+            temperature=0.3,
+            max_tokens=4000
+        )
         
-        Use simple language that a beginner programmer would understand.
-        """ 
+        # Extract the content from the response
+        content = response["choices"][0]["message"]["content"]
+        
+        # Parse JSON from the content
+        # Find JSON block in the response if it's not pure JSON
+        if not content.strip().startswith("{"):
+            import re
+            json_match = re.search(r"```json\s*([\s\S]*?)\s*```", content)
+            if json_match:
+                content = json_match.group(1)
+            else:
+                # Try to find any JSON-like structure
+                json_match = re.search(r"\{[\s\S]*\"fixed_code\"[\s\S]*\"explanation\"[\s\S]*\}", content)
+                if json_match:
+                    content = json_match.group(0)
+        
+        result = json.loads(content)
+        
+        # Ensure the result has the expected structure
+        if "fixed_code" not in result or "explanation" not in result:
+            raise ValueError("Invalid response format from Groq API")
+        
+        return result
+        
+    except Exception as e:
+        # Handle errors and provide a fallback response
+        return {
+            "fixed_code": code,  # Return original code as fallback
+            "explanation": f"Error generating fix: {str(e)}"
+        } 

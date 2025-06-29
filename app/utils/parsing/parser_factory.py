@@ -1,27 +1,35 @@
+from typing import Dict, Type
+
 from app.utils.parsing.base_parser import BaseParser
 from app.utils.parsing.python_parser import PythonParser
 from app.utils.parsing.javascript_parser import JavaScriptParser
 
+# Registry of language parsers
+_parsers: Dict[str, Type[BaseParser]] = {
+    "python": PythonParser,
+    "javascript": JavaScriptParser,
+    # Add more parsers as they are implemented
+}
 
 def get_parser_for_language(language: str) -> BaseParser:
     """
-    Get the appropriate parser for a language
+    Get a parser for the specified programming language
     
     Args:
-        language: Programming language name (e.g., 'python', 'javascript')
-    
+        language: The programming language to get a parser for
+        
     Returns:
-        A parser instance for the specified language
-    
+        An instance of the appropriate parser
+        
     Raises:
-        ValueError: If the language is not supported
+        ValueError: If no parser is available for the language
     """
     language = language.lower()
     
-    if language in ["python", "py"]:
-        return PythonParser()
-    elif language in ["javascript", "js", "typescript", "ts"]:
-        return JavaScriptParser()
-    else:
-        # For unsupported languages, return the base parser
-        return BaseParser() 
+    # Check if we have a parser for this language
+    if language in _parsers:
+        return _parsers[language]()
+    
+    # Fall back to a default parser for unknown languages
+    # In a real implementation, you might want to raise an error instead
+    return PythonParser()  # Default to Python parser 

@@ -1,8 +1,9 @@
 import enum
 
-from sqlalchemy import Column, Enum, ForeignKey, JSON, String, Text
+from sqlalchemy import Column, Enum, ForeignKey, JSON, String, Text, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from app.models.db.base import BaseModel
 
@@ -15,21 +16,32 @@ class AnalysisStatus(enum.Enum):
 
 
 class AnalysisRequest(BaseModel):
-    """Analysis Request model for database"""
+    """
+    Model for code analysis requests
+    """
     __tablename__ = "analysis_requests"
     
-    # Request details
-    language = Column(String, nullable=False)
+    # Code details
     code = Column(Text, nullable=False)
-    status = Column(Enum(AnalysisStatus), default=AnalysisStatus.PENDING, nullable=False)
+    language = Column(String, nullable=False)
+    file_path = Column(String, nullable=True)
     
     # Analysis results
+    status = Column(String, nullable=False, default="pending")
     issues = Column(JSON, nullable=True)
+    summary = Column(Text, nullable=True)
     error = Column(Text, nullable=True)
     
     # Foreign keys
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
     
     # Relationships
     user = relationship("User", back_populates="analysis_requests")
-    fix_requests = relationship("FixRequest", back_populates="analysis_request", cascade="all, delete-orphan") 
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    def __repr__(self):
+        return f"<AnalysisRequest(id='{self.id}', user_id='{self.user_id}', status='{self.status}')>" 

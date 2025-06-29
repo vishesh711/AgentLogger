@@ -1,143 +1,206 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple, Any
+import json
+import os
+from datetime import datetime
 from uuid import UUID
-
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.db.analysis import AnalysisRequest
 from app.models.db.fix import FixRequest, FixStatus
 from app.models.schemas.analysis import CodeIssue
-from app.models.schemas.fix import FixRequestCreate
-from app.services.ai.groq_client import GroqClient
+from app.models.schemas.fix import (
+    FixRequestCreate, 
+    FixRequestResponse, 
+    FixRequestUpdate
+)
+from app.services.ai.groq_client import GroqClient, get_fix_from_groq
 from app.services.analysis_service import get_analysis_request
-from app.services.github_service import create_github_pr
 from app.utils.parsing.parser_factory import get_parser_for_language
+from app.utils.sandbox.code_runner import run_code_in_sandbox
 
+# Define types for clarity
+CodeFix = Dict[str, Any]
+ValidationResult = Tuple[bool, Optional[str]]
 
 async def create_fix_request(
-    db: Session, fix_data: FixRequestCreate, user_id: UUID
-) -> FixRequest:
+    db: Session, 
+    fix_request: FixRequestCreate, 
+    user_id: str
+) -> FixRequestResponse:
     """
-    Create a new fix request
+    Create a new fix request in the database
     """
-    # Get the analysis request to ensure it exists
-    analysis = await get_analysis_request(db, fix_data.analysis_id)
-    if not analysis:
-        raise ValueError(f"Analysis request with ID {fix_data.analysis_id} not found")
-    
-    # Create the fix request
-    db_fix = FixRequest(
-        issue_id=fix_data.issue_id,
-        create_pr=fix_data.create_pr,
+    db_fix_request = FixRequest(
         user_id=user_id,
-        analysis_id=fix_data.analysis_id,
+        code=fix_request.code,
+        language=fix_request.language,
+        error_message=fix_request.error_message,
+        context=fix_request.context,
+        status="pending"
     )
     
-    db.add(db_fix)
+    db.add(db_fix_request)
     db.commit()
-    db.refresh(db_fix)
-    return db_fix
+    db.refresh(db_fix_request)
+    
+    # Start the fix process asynchronously
+    # In a real implementation, this would be a background task
+    await process_fix_request(db, db_fix_request.id)
+    
+    return FixRequestResponse.model_validate(db_fix_request)
 
-
-async def get_fix_request(db: Session, fix_id: UUID) -> Optional[FixRequest]:
+async def get_fix_request(db: Session, fix_id: str) -> Optional[FixRequestResponse]:
     """
     Get a fix request by ID
     """
-    return db.query(FixRequest).filter(FixRequest.id == fix_id).first()
+    db_fix_request = db.query(FixRequest).filter(FixRequest.id == fix_id).first()
+    if not db_fix_request:
+        return None
+    
+    return FixRequestResponse.model_validate(db_fix_request)
 
-
-async def get_fix_requests_by_user(db: Session, user_id: UUID, skip: int = 0, limit: int = 100) -> List[FixRequest]:
+async def get_user_fix_requests(db: Session, user_id: str, skip: int = 0, limit: int = 100) -> List[FixRequestResponse]:
     """
     Get all fix requests for a user
     """
-    return (
-        db.query(FixRequest)
-        .filter(FixRequest.user_id == user_id)
-        .order_by(FixRequest.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    db_fix_requests = db.query(FixRequest).filter(
+        FixRequest.user_id == user_id
+    ).offset(skip).limit(limit).all()
+    
+    return [FixRequestResponse.model_validate(fr) for fr in db_fix_requests]
 
-
-async def get_fix_requests_by_analysis(db: Session, analysis_id: UUID) -> List[FixRequest]:
+async def process_fix_request(db: Session, fix_id: str) -> None:
     """
-    Get all fix requests for an analysis
-    """
-    return (
-        db.query(FixRequest)
-        .filter(FixRequest.analysis_id == analysis_id)
-        .order_by(FixRequest.created_at.desc())
-        .all()
-    )
-
-
-async def generate_fix(db: Session, fix_id: UUID) -> Dict[str, str]:
-    """
-    Generate a fix for a specific issue
+    Process a fix request by generating a fix using AI
     """
     # Get the fix request
-    fix = await get_fix_request(db, fix_id)
-    if not fix:
-        raise ValueError(f"Fix request with ID {fix_id} not found")
+    db_fix_request = db.query(FixRequest).filter(FixRequest.id == fix_id).first()
+    if not db_fix_request:
+        return
     
-    # Get the analysis request
-    analysis = await get_analysis_request(db, fix.analysis_id)
-    if not analysis:
-        raise ValueError(f"Analysis request with ID {fix.analysis_id} not found")
-    
-    # Update status to processing
-    fix.status = FixStatus.PROCESSING
+    # Update status
+    db_fix_request.status = "processing"
     db.commit()
     
     try:
-        # Find the issue in the analysis
-        issue_dict = next(
-            (issue for issue in analysis.issues if issue.get("id") == fix.issue_id),
-            None
+        # Generate fix using Groq
+        fix_result = await get_fix_from_groq(
+            code=db_fix_request.code,
+            language=db_fix_request.language,
+            error_message=db_fix_request.error_message,
+            context=db_fix_request.context
         )
         
-        if not issue_dict:
-            raise ValueError(f"Issue with ID {fix.issue_id} not found in analysis")
+        # Validate the fix
+        is_valid, validation_message = await validate_fix(
+            original_code=db_fix_request.code,
+            fixed_code=fix_result["fixed_code"],
+            language=db_fix_request.language
+        )
         
-        # Convert the issue dict to a CodeIssue object
-        issue = CodeIssue(**issue_dict)
+        # Update the fix request
+        db_fix_request.fixed_code = fix_result["fixed_code"]
+        db_fix_request.explanation = fix_result["explanation"]
+        db_fix_request.status = "completed" if is_valid else "failed"
+        db_fix_request.validation_message = validation_message
+        db_fix_request.completed_at = datetime.utcnow()
         
-        # Get the parser for the language
-        parser = get_parser_for_language(analysis.language)
-        
-        # Pre-process the code if needed
-        preprocessed_code = parser.preprocess(analysis.code)
-        
-        # Generate the fix using the LLM
-        groq_client = GroqClient()
-        fix_result = await groq_client.fix_issue(preprocessed_code, analysis.language, issue)
-        
-        # Post-process the fixed code if needed
-        fixed_code = parser.process_fix_result(fix_result["fixed_code"])
-        
-        # Update the fix request with the results
-        fix.fixed_code = fixed_code
-        fix.explanation = fix_result["explanation"]
-        fix.status = FixStatus.COMPLETED
         db.commit()
         
-        # Create GitHub PR if requested
-        if fix.create_pr and fix.github_pr:
-            pr_url = await create_github_pr(db, fix_id)
-            fix.pr_url = pr_url
-            fix.pr_created = True
-            db.commit()
+    except Exception as e:
+        # Handle errors
+        db_fix_request.status = "failed"
+        db_fix_request.validation_message = f"Error processing fix: {str(e)}"
+        db.commit()
+
+async def validate_fix(original_code: str, fixed_code: str, language: str) -> ValidationResult:
+    """
+    Validate a fix by running it in a sandbox
+    """
+    # Skip validation if sandbox is disabled
+    if not settings.USE_DOCKER_SANDBOX:
+        return True, "Sandbox validation skipped"
+    
+    try:
+        # Run the fixed code in a sandbox
+        result = await run_code_in_sandbox(fixed_code, language, timeout=settings.EXECUTION_TIMEOUT)
         
-        return {
-            "fixed_code": fixed_code,
-            "explanation": fix_result["explanation"],
-            "pr_url": fix.pr_url,
-        }
+        if result["success"]:
+            return True, "Code executed successfully"
+        else:
+            return False, f"Code execution failed: {result['error']}"
     
     except Exception as e:
-        # Update status to failed
-        fix.status = FixStatus.FAILED
-        fix.error = str(e)
-        db.commit()
-        
-        raise e 
+        return False, f"Validation error: {str(e)}"
+
+def create_diff(original_code: str, fixed_code: str) -> str:
+    """
+    Create a unified diff between original and fixed code
+    """
+    # In a real implementation, use a proper diff library
+    # This is a simplified version
+    parser = get_parser_for_language("python")  # Default to Python parser
+    
+    # Parse both code versions
+    original_lines = original_code.splitlines()
+    fixed_lines = fixed_code.splitlines()
+    
+    # Generate a simple diff
+    diff_lines = []
+    for i, (orig, fixed) in enumerate(zip(original_lines, fixed_lines)):
+        if orig != fixed:
+            diff_lines.append(f"Line {i+1}: - {orig}")
+            diff_lines.append(f"Line {i+1}: + {fixed}")
+    
+    # Handle different lengths
+    if len(original_lines) < len(fixed_lines):
+        for i, line in enumerate(fixed_lines[len(original_lines):], start=len(original_lines)):
+            diff_lines.append(f"Line {i+1}: + {line}")
+    elif len(original_lines) > len(fixed_lines):
+        for i, line in enumerate(original_lines[len(fixed_lines):], start=len(fixed_lines)):
+            diff_lines.append(f"Line {i+1}: - {line}")
+    
+    return "\n".join(diff_lines)
+
+async def generate_fix(db: Session, fix_id: str) -> Dict[str, str]:
+    """
+    Generate a fix for a code issue
+    """
+    # Get the fix request
+    fix_request = await get_fix_request(db, fix_id)
+    if not fix_request:
+        raise ValueError(f"Fix request with ID {fix_id} not found")
+    
+    # Process the fix request
+    await process_fix_request(db, fix_id)
+    
+    # Get the updated fix request
+    updated_fix = await get_fix_request(db, fix_id)
+    
+    return {
+        "fixed_code": updated_fix.fixed_code or "",
+        "explanation": updated_fix.explanation or "",
+        "status": updated_fix.status
+    }
+
+async def create_github_pr_for_fix(db: Session, fix_id: str, repo_name: str, file_path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Create a GitHub PR for a fix
+    """
+    # Import here to avoid circular imports
+    from app.services.github_service import create_github_pr
+    
+    # Get the fix request
+    db_fix = db.query(FixRequest).filter(FixRequest.id == fix_id).first()
+    if not db_fix:
+        raise ValueError(f"Fix request with ID {fix_id} not found")
+    
+    # Create the PR
+    return await create_github_pr(
+        db=db,
+        fix_id=fix_id,
+        repo_name=repo_name,
+        file_path=file_path,
+        fix_request=db_fix
+    ) 

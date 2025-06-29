@@ -6,12 +6,9 @@ import os
 import logging
 from fastapi.openapi.utils import get_openapi
 
-from app.api.v1.routes import analyze, fix, explain, patch, github, health
-from app.config import settings
-from app.api.middleware.auth import verify_api_key
-from app.api.middleware.rate_limit import RateLimitMiddleware
+from app.core.config import settings
+from app.core.middleware import add_middleware
 from app.api.v1.router import api_router
-from app.core.middleware import api_key_middleware, rate_limit_middleware
 
 # Configure logging
 logging.basicConfig(
@@ -27,23 +24,21 @@ app = FastAPI(
     version=settings.VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Add rate limiting middleware
-app.add_middleware(RateLimitMiddleware)
+# Set up CORS
+if settings.CORS_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[str(origin) for origin in settings.CORS_ORIGINS],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Add custom middleware
-app.middleware("http")(api_key_middleware)
-app.middleware("http")(rate_limit_middleware)
+add_middleware(app)
 
 # Add request timing middleware
 @app.middleware("http")

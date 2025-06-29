@@ -8,27 +8,29 @@ from pydantic import BaseModel, EmailStr, Field
 # Base User Schema
 class UserBase(BaseModel):
     email: EmailStr
-    name: Optional[str] = None
+    full_name: Optional[str] = None
     is_active: bool = True
 
 
 # Schema for creating a new user
 class UserCreate(UserBase):
-    pass
+    password: str
 
 
 # Schema for updating a user
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
-    name: Optional[str] = None
+    full_name: Optional[str] = None
     is_active: Optional[bool] = None
+    password: Optional[str] = None
 
 
 # Schema for returning a user
 class UserResponse(UserBase):
     id: UUID
+    is_superuser: bool
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True 
+    model_config = {"from_attributes": True} 

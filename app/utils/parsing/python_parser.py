@@ -1,12 +1,155 @@
 import ast
-from typing import List
+import re
+from typing import Dict, List, Any, Optional
 
 from app.models.schemas.analysis import CodeIssue
 from app.utils.parsing.base_parser import BaseParser
 
 
 class PythonParser(BaseParser):
-    """Python-specific code parser"""
+    """
+    Parser for Python code
+    """
+    
+    def parse(self, code: str) -> Dict[str, Any]:
+        """
+        Parse Python code and extract structure information
+        
+        Args:
+            code: Python source code to parse
+            
+        Returns:
+            Dictionary with parsed information
+        """
+        result = super().parse(code)
+        
+        try:
+            # Parse the code using ast
+            tree = ast.parse(code)
+            
+            # Extract functions and classes
+            result["functions"] = self.extract_functions(code)
+            result["classes"] = self.extract_classes(code)
+            result["imports"] = self.identify_imports(code)
+            
+            # Add more Python-specific information
+            result["ast_type"] = type(tree).__name__
+            
+        except SyntaxError as e:
+            # Handle syntax errors
+            result["error"] = {
+                "type": "SyntaxError",
+                "message": str(e),
+                "line": e.lineno,
+                "column": e.offset
+            }
+        
+        return result
+    
+    def extract_functions(self, code: str) -> List[Dict[str, Any]]:
+        """
+        Extract functions from Python code
+        
+        Args:
+            code: Python source code to analyze
+            
+        Returns:
+            List of dictionaries with function information
+        """
+        functions = []
+        
+        try:
+            tree = ast.parse(code)
+            
+            # Find all function definitions
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    functions.append({
+                        "name": node.name,
+                        "line": node.lineno,
+                        "args": [arg.arg for arg in node.args.args],
+                        "decorators": [
+                            ast.unparse(decorator) for decorator in node.decorator_list
+                        ] if hasattr(ast, "unparse") else []  # ast.unparse is Python 3.9+
+                    })
+        
+        except SyntaxError:
+            # If there's a syntax error, return an empty list
+            pass
+        
+        return functions
+    
+    def extract_classes(self, code: str) -> List[Dict[str, Any]]:
+        """
+        Extract classes from Python code
+        
+        Args:
+            code: Python source code to analyze
+            
+        Returns:
+            List of dictionaries with class information
+        """
+        classes = []
+        
+        try:
+            tree = ast.parse(code)
+            
+            # Find all class definitions
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    # Get methods in the class
+                    methods = []
+                    for child in node.body:
+                        if isinstance(child, ast.FunctionDef):
+                            methods.append(child.name)
+                    
+                    classes.append({
+                        "name": node.name,
+                        "line": node.lineno,
+                        "methods": methods,
+                        "bases": [
+                            ast.unparse(base) for base in node.bases
+                        ] if hasattr(ast, "unparse") else []  # ast.unparse is Python 3.9+
+                    })
+        
+        except SyntaxError:
+            # If there's a syntax error, return an empty list
+            pass
+        
+        return classes
+    
+    def identify_imports(self, code: str) -> List[str]:
+        """
+        Identify imports in Python code
+        
+        Args:
+            code: Python source code to analyze
+            
+        Returns:
+            List of import statements
+        """
+        imports = []
+        
+        try:
+            tree = ast.parse(code)
+            
+            # Find all import statements
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    for name in node.names:
+                        imports.append(f"import {name.name}")
+                elif isinstance(node, ast.ImportFrom):
+                    module = node.module or ""
+                    for name in node.names:
+                        imports.append(f"from {module} import {name.name}")
+        
+        except SyntaxError:
+            # If there's a syntax error, try regex-based approach
+            import_pattern = r"^\s*(from\s+[\w.]+\s+import\s+[\w.*,\s]+|import\s+[\w.,\s]+)"
+            imports = [line.strip() for line in code.splitlines() 
+                      if re.match(import_pattern, line)]
+        
+        return imports
     
     def preprocess(self, code: str) -> str:
         """

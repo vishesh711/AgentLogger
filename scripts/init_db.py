@@ -16,10 +16,6 @@ from sqlalchemy.orm import Session
 from app.core.db import SessionLocal
 from app.models.db.user import User
 from app.models.db.api_key import ApiKey
-from app.models.schemas.user import UserCreate
-from app.models.schemas.api_key import ApiKeyCreate
-from app.services.user_service import create_user
-from app.services.api_key_service import create_api_key
 
 
 def init_db(db: Session) -> None:
@@ -28,7 +24,7 @@ def init_db(db: Session) -> None:
     """
     # Create a default admin user
     admin_email = os.getenv("ADMIN_EMAIL", "admin@agentlogger.com")
-    admin_name = os.getenv("ADMIN_NAME", "Admin")
+    admin_name = os.getenv("ADMIN_NAME", "Admin User")
     
     # Check if the admin user already exists
     admin_user = db.query(User).filter(User.email == admin_email).first()
@@ -36,8 +32,10 @@ def init_db(db: Session) -> None:
         print(f"Creating admin user: {admin_email}")
         admin_user = User(
             email=admin_email,
-            name=admin_name,
+            full_name=admin_name,
+            hashed_password="$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",  # "password"
             is_active=True,
+            is_superuser=True
         )
         db.add(admin_user)
         db.commit()
@@ -49,19 +47,33 @@ def init_db(db: Session) -> None:
     api_key = db.query(ApiKey).filter(ApiKey.user_id == admin_user.id).first()
     if not api_key:
         print("Creating API key for admin user")
+        import secrets
+        from datetime import datetime, timedelta
+        
+        raw_api_key = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(days=365)
+        
         api_key = ApiKey(
-            key=ApiKey.generate_key(),
+            key=raw_api_key,
             name="Default API Key",
+            description="Default API key for admin user",
             is_active=True,
-            expires_at=ApiKey.generate_expiry(days=365),
+            expires_at=expires_at,
             user_id=admin_user.id,
         )
         db.add(api_key)
         db.commit()
         db.refresh(api_key)
         
-        print(f"API Key: {api_key.key}")
-        print("IMPORTANT: Save this API key as it will not be shown again!")
+        print(f"\nAPI Key generated successfully!")
+        print("=" * 60)
+        print(f"API Key: {raw_api_key}")
+        print(f"User ID: {admin_user.id}")
+        print(f"Expires: {expires_at}")
+        print("=" * 60)
+        print("\nUse this key in your requests with the X-API-Key header:")
+        print(f"curl -H 'X-API-Key: {raw_api_key}' http://localhost:8000/api/v1/health")
+        print("=" * 60)
     else:
         print("API key already exists for admin user")
 

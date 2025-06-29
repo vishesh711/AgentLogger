@@ -1,7 +1,8 @@
 import enum
 
-from sqlalchemy import Column, Enum, String, Text, Integer
+from sqlalchemy import Column, Enum, String, Text, Integer, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from app.models.db.base import BaseModel
 
@@ -13,21 +14,26 @@ class PRStatus(enum.Enum):
 
 
 class GitHubPR(BaseModel):
-    """GitHub Pull Request model for database"""
+    """
+    Model for GitHub pull requests
+    """
     __tablename__ = "github_prs"
     
-    # Repository details
-    owner = Column(String, nullable=False)
-    repo = Column(String, nullable=False)
-    
     # PR details
-    pr_number = Column(Integer, nullable=True)
-    pr_url = Column(String, nullable=True)
-    title = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
-    branch_name = Column(String, nullable=False)
-    base_branch = Column(String, nullable=False, default="main")
-    status = Column(Enum(PRStatus), default=PRStatus.OPEN, nullable=False)
+    repo_name = Column(String, nullable=False)
+    pr_number = Column(Integer, nullable=False)
+    pr_url = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="open")
+    
+    # Foreign keys
+    fix_id = Column(String, ForeignKey("fix_requests.id"), nullable=False)
     
     # Relationships
-    fix_request = relationship("FixRequest", back_populates="github_pr", uselist=False) 
+    fix_request = relationship("FixRequest", back_populates="github_prs")
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    def __repr__(self):
+        return f"<GitHubPR(id='{self.id}', repo='{self.repo_name}', pr_number={self.pr_number})>" 

@@ -2,10 +2,13 @@ import time
 from collections import defaultdict
 from typing import Callable, Dict, Tuple
 
-from fastapi import HTTPException, Request, Response
+from fastapi import HTTPException, Request, Response, FastAPI, status, Depends
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_429_TOO_MANY_REQUESTS
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
+from app.core.db import get_db
 from app.services.api_key_service import verify_api_key_service
 
 # Simple in-memory rate limiter
@@ -39,52 +42,113 @@ class RateLimiter:
 rate_limiter = RateLimiter()
 
 
-async def api_key_middleware(request: Request, call_next: Callable) -> Response:
+class RateLimitMiddleware(BaseHTTPMiddleware):
     """
-    Middleware to verify API key for protected routes
+    Middleware for rate limiting API requests based on client IP or API key.
     """
-    # Skip API key verification for docs, redoc, and health check
-    if request.url.path in ["/docs", "/redoc", "/openapi.json", f"{settings.API_V1_STR}/health"]:
+    def __init__(self, app: FastAPI):
+        super().__init__(app)
+        # In a production environment, use Redis or another distributed cache
+        self.cache: Dict[str, Dict] = {}
+        
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # Get client identifier (API key or IP)
+        client_id = request.headers.get("X-API-Key") or request.client.host
+        
+        # Skip rate limiting for certain paths
+        if request.url.path == "/api/v1/health":
+            return await call_next(request)
+        
+        # Check rate limit
+        current_time = time.time()
+        if client_id in self.cache:
+            request_history = self.cache[client_id]
+            # Clean old requests
+            request_history["timestamps"] = [
+                ts for ts in request_history["timestamps"] 
+                if current_time - ts < 60  # 1 minute window
+            ]
+            
+            # Check if rate limit exceeded
+            if len(request_history["timestamps"]) >= settings.RATE_LIMIT_PER_MINUTE:
+                return JSONResponse(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    content={"detail": "Rate limit exceeded. Try again later."}
+                )
+            
+            # Add current request timestamp
+            request_history["timestamps"].append(current_time)
+        else:
+            # First request from this client
+            self.cache[client_id] = {"timestamps": [current_time]}
+        
+        # Process the request
         return await call_next(request)
-    
-    api_key = request.headers.get("X-API-Key")
-    
-    if not api_key:
-        raise HTTPException(
-            status_code=HTTP_401_UNAUTHORIZED,
-            detail="Missing API key. Please provide a valid API key in the X-API-Key header.",
-        )
-    
-    # Verify the API key
-    user_id = await verify_api_key_service(api_key)
-    
-    if not user_id:
-        raise HTTPException(
-            status_code=HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key. Please provide a valid API key.",
-        )
-    
-    # Add the user_id to the request state
-    request.state.user_id = user_id
-    
-    return await call_next(request)
 
 
-async def rate_limit_middleware(request: Request, call_next: Callable) -> Response:
+class APIKeyMiddleware(BaseHTTPMiddleware):
     """
-    Middleware to implement rate limiting
+    Middleware for API key authentication.
     """
-    # Skip rate limiting for docs, redoc, and health check
-    if request.url.path in ["/docs", "/redoc", "/openapi.json", f"{settings.API_V1_STR}/health"]:
+    def __init__(self, app: FastAPI):
+        super().__init__(app)
+        # Paths that don't require API key
+        self.public_paths = {
+            "/api/v1/health", 
+            "/docs", 
+            "/redoc", 
+            "/openapi.json",
+            "/api/v1/openapi.json"
+        }
+        
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # Skip API key check for public paths
+        path = request.url.path
+        if any(path.startswith(public_path) for public_path in self.public_paths) or \
+           any(path.endswith(public_path) for public_path in ["/openapi.json"]):
+            return await call_next(request)
+        
+        # Check for API key
+        api_key = request.headers.get("X-API-Key")
+        if not api_key:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Missing API key"}
+            )
+        
+        # Get database session
+        db = next(get_db())
+        
+        # Verify API key
+        user_id = await verify_api_key_service(db, api_key)
+        if not user_id:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Invalid API key"}
+            )
+        
+        # Store user ID in request state
+        request.state.user_id = user_id
+        
         return await call_next(request)
+
+
+def add_middleware(app: FastAPI) -> None:
+    """
+    Add all middleware to the FastAPI application.
+    """
+    # Add rate limiting middleware
+    if settings.RATE_LIMIT_PER_MINUTE > 0:
+        app.add_middleware(RateLimitMiddleware)
     
-    # Use API key or IP address as the rate limit key
-    rate_limit_key = request.headers.get("X-API-Key", request.client.host)
+    # Add API key middleware
+    app.add_middleware(APIKeyMiddleware)
     
-    if rate_limiter.is_rate_limited(rate_limit_key):
-        raise HTTPException(
-            status_code=HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Rate limit exceeded. Maximum {settings.RATE_LIMIT_PER_MINUTE} requests per minute allowed.",
-        )
-    
-    return await call_next(request) 
+    # Add timing middleware for debugging
+    @app.middleware("http")
+    async def add_process_time_header(request: Request, call_next):
+        start_time = time.time()
+        response = await call_next(request)
+        process_time = time.time() - start_time
+        response.headers["X-Process-Time"] = str(process_time)
+        return response 

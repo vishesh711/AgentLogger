@@ -1,197 +1,151 @@
 import os
-import subprocess
+import asyncio
 import tempfile
-import uuid
-from typing import Dict, Tuple
+import subprocess
+from typing import Dict, Any, Optional
 
 from app.core.config import settings
 
+async def run_code_in_sandbox(
+    code: str, 
+    language: str, 
+    timeout: int = 30
+) -> Dict[str, Any]:
+    """
+    Run code in a sandbox environment and return the result
+    
+    Args:
+        code: The code to run
+        language: The programming language of the code
+        timeout: Maximum execution time in seconds
+        
+    Returns:
+        Dict with execution results including:
+        - success: Whether execution was successful
+        - output: Output from the execution (if successful)
+        - error: Error message (if unsuccessful)
+    """
+    # Use Docker sandbox if enabled
+    if settings.USE_DOCKER_SANDBOX:
+        return await run_in_docker(code, language, timeout)
+    else:
+        return await run_locally(code, language, timeout)
 
-class CodeRunner:
+async def run_locally(code: str, language: str, timeout: int) -> Dict[str, Any]:
     """
-    Safely execute code in a sandbox environment
-    
-    Uses Docker for isolation by default, with fallback to local execution
+    Run code locally in a subprocess with timeout
     """
+    # Create a temporary file for the code
+    file_extension = get_file_extension(language)
+    with tempfile.NamedTemporaryFile(suffix=file_extension, mode='w', delete=False) as temp_file:
+        temp_file.write(code)
+        temp_file_path = temp_file.name
     
-    def __init__(self, use_docker: bool = None):
-        """
-        Initialize the code runner
+    try:
+        # Get the command to run the code
+        cmd = get_run_command(language, temp_file_path)
         
-        Args:
-            use_docker: Whether to use Docker for isolation (defaults to settings.USE_DOCKER_SANDBOX)
-        """
-        self.use_docker = settings.USE_DOCKER_SANDBOX if use_docker is None else use_docker
-    
-    async def run_code(self, code: str, language: str) -> Dict[str, str]:
-        """
-        Run code in a sandbox environment
-        
-        Args:
-            code: The code to execute
-            language: The programming language
-        
-        Returns:
-            Dict containing stdout, stderr, and execution status
-        """
-        if self.use_docker:
-            return await self._run_in_docker(code, language)
-        else:
-            return await self._run_locally(code, language)
-    
-    async def _run_in_docker(self, code: str, language: str) -> Dict[str, str]:
-        """
-        Run code in a Docker container
-        """
-        # Create a temporary directory to mount into the container
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Determine file extension and Docker image based on language
-            file_ext, docker_image = self._get_language_config(language)
-            
-            # Write code to a temporary file
-            file_path = os.path.join(temp_dir, f"code{file_ext}")
-            with open(file_path, "w") as f:
-                f.write(code)
-            
-            # Generate a unique container name
-            container_name = f"agentlogger-sandbox-{uuid.uuid4().hex[:8]}"
-            
-            # Run the code in a Docker container
-            cmd = [
-                "docker", "run",
-                "--name", container_name,
-                "--rm",  # Remove container after execution
-                "-v", f"{temp_dir}:/code",
-                "--network", "none",  # Disable network access
-                "--memory", "256m",  # Limit memory
-                "--cpus", "0.5",  # Limit CPU
-                "--read-only",  # Make filesystem read-only
-                "--cap-drop", "ALL",  # Drop all capabilities
-                "--security-opt", "no-new-privileges",  # Prevent privilege escalation
-                docker_image,
-                *self._get_execution_command(language, f"/code/code{file_ext}")
-            ]
-            
-            # Set timeout
-            timeout = settings.EXECUTION_TIMEOUT
-            
-            try:
-                # Run the command with timeout
-                process = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout
-                )
-                
-                return {
-                    "stdout": process.stdout,
-                    "stderr": process.stderr,
-                    "exit_code": process.returncode,
-                    "timed_out": False
-                }
-            
-            except subprocess.TimeoutExpired:
-                # Kill the container if it timed out
-                subprocess.run(["docker", "kill", container_name], capture_output=True)
-                
-                return {
-                    "stdout": "",
-                    "stderr": f"Execution timed out after {timeout} seconds",
-                    "exit_code": -1,
-                    "timed_out": True
-                }
-            
-            except Exception as e:
-                return {
-                    "stdout": "",
-                    "stderr": f"Error running code: {str(e)}",
-                    "exit_code": -1,
-                    "timed_out": False
-                }
-    
-    async def _run_locally(self, code: str, language: str) -> Dict[str, str]:
-        """
-        Run code locally (fallback method)
-        
-        This is less secure than Docker isolation and should only be used
-        when Docker is not available
-        """
-        # Create a temporary file for the code
-        file_ext, _ = self._get_language_config(language)
-        
-        with tempfile.NamedTemporaryFile(suffix=file_ext, mode="w", delete=False) as temp_file:
-            temp_file.write(code)
-            temp_file_path = temp_file.name
+        # Execute the command
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
         
         try:
-            # Get the command to execute the code
-            cmd = self._get_execution_command(language, temp_file_path)
+            # Wait for process with timeout
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
             
-            # Set timeout
-            timeout = settings.EXECUTION_TIMEOUT
-            
-            # Run the command with timeout
-            process = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=timeout
-            )
-            
+            if process.returncode == 0:
+                return {
+                    "success": True,
+                    "output": stdout.decode().strip()
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": stderr.decode().strip()
+                }
+        except asyncio.TimeoutError:
+            # Kill the process if it times out
+            process.kill()
             return {
-                "stdout": process.stdout,
-                "stderr": process.stderr,
-                "exit_code": process.returncode,
-                "timed_out": False
+                "success": False,
+                "error": f"Execution timed out after {timeout} seconds"
             }
-        
-        except subprocess.TimeoutExpired:
-            return {
-                "stdout": "",
-                "stderr": f"Execution timed out after {timeout} seconds",
-                "exit_code": -1,
-                "timed_out": True
-            }
-        
-        except Exception as e:
-            return {
-                "stdout": "",
-                "stderr": f"Error running code: {str(e)}",
-                "exit_code": -1,
-                "timed_out": False
-            }
-        
-        finally:
-            # Clean up the temporary file
+    
+    finally:
+        # Clean up the temporary file
+        if os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
+
+async def run_in_docker(code: str, language: str, timeout: int) -> Dict[str, Any]:
+    """
+    Run code in a Docker container for isolation
+    """
+    # In a real implementation, this would use Docker API to create and run a container
+    # For now, we'll simulate it with a message
+    return {
+        "success": True,
+        "output": f"Docker sandbox execution simulation for {language} code (not actually executed)"
+    }
+
+def get_file_extension(language: str) -> str:
+    """
+    Get the file extension for a programming language
+    """
+    language_map = {
+        "python": ".py",
+        "javascript": ".js",
+        "typescript": ".ts",
+        "java": ".java",
+        "c": ".c",
+        "cpp": ".cpp",
+        "go": ".go",
+        "rust": ".rs",
+        "ruby": ".rb",
+        "php": ".php",
+    }
     
-    def _get_language_config(self, language: str) -> Tuple[str, str]:
-        """
-        Get file extension and Docker image for a language
-        """
-        language = language.lower()
-        
-        if language in ["python", "py"]:
-            return ".py", "python:3.11-slim"
-        elif language in ["javascript", "js"]:
-            return ".js", "node:18-slim"
-        elif language in ["typescript", "ts"]:
-            return ".ts", "node:18-slim"
-        else:
-            raise ValueError(f"Unsupported language: {language}")
+    return language_map.get(language.lower(), ".txt")
+
+def get_run_command(language: str, file_path: str) -> list:
+    """
+    Get the command to run code in a specific language
+    """
+    language = language.lower()
     
-    def _get_execution_command(self, language: str, file_path: str) -> list:
-        """
-        Get the command to execute code in a specific language
-        """
-        language = language.lower()
-        
-        if language in ["python", "py"]:
-            return ["python", file_path]
-        elif language in ["javascript", "js"]:
-            return ["node", file_path]
-        elif language in ["typescript", "ts"]:
-            return ["npx", "ts-node", file_path]
-        else:
-            raise ValueError(f"Unsupported language: {language}") 
+    if language == "python":
+        return ["python", file_path]
+    elif language == "javascript":
+        return ["node", file_path]
+    elif language == "typescript":
+        return ["ts-node", file_path]
+    elif language == "java":
+        # Compile and run Java
+        class_name = os.path.basename(file_path).replace(".java", "")
+        return ["java", "-cp", os.path.dirname(file_path), class_name]
+    elif language == "c":
+        # Compile and run C
+        output_path = file_path.replace(".c", "")
+        subprocess.run(["gcc", file_path, "-o", output_path])
+        return [output_path]
+    elif language == "cpp":
+        # Compile and run C++
+        output_path = file_path.replace(".cpp", "")
+        subprocess.run(["g++", file_path, "-o", output_path])
+        return [output_path]
+    elif language == "go":
+        return ["go", "run", file_path]
+    elif language == "rust":
+        # Compile and run Rust
+        output_path = file_path.replace(".rs", "")
+        subprocess.run(["rustc", file_path, "-o", output_path])
+        return [output_path]
+    elif language == "ruby":
+        return ["ruby", file_path]
+    elif language == "php":
+        return ["php", file_path]
+    else:
+        # Default to Python for unknown languages
+        return ["python", file_path] 

@@ -1,28 +1,38 @@
 import secrets
 from datetime import datetime, timedelta
 
-from sqlalchemy import Boolean, Column, ForeignKey, String, DateTime
+from sqlalchemy import Boolean, Column, ForeignKey, String, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from app.models.db.base import BaseModel
 
 
 class ApiKey(BaseModel):
-    """API Key model for database"""
+    """
+    Model for API keys
+    """
     __tablename__ = "api_keys"
     
-    key = Column(String, unique=True, index=True, nullable=False, default=lambda: secrets.token_urlsafe(32))
+    # API key details
+    key = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    expires_at = Column(DateTime, nullable=True)
-    last_used_at = Column(DateTime, nullable=True)
     
     # Foreign keys
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False)
     
     # Relationships
     user = relationship("User", back_populates="api_keys")
+    
+    # Additional timestamps
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    
+    def __repr__(self):
+        return f"<ApiKey(id='{self.id}', user_id='{self.user_id}')>"
     
     @property
     def is_expired(self) -> bool:
