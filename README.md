@@ -9,12 +9,17 @@ AgentLogger is an AI-powered debugging API service that helps developers detect,
 - **Fix Generation**: Receive AI-generated fixes for detected bugs
 - **GitHub Integration**: Create pull requests with fixes
 - **Multi-language Support**: Works with Python, JavaScript, and more
+- **Agent-Based Architecture**: Autonomous debugging with specialized agents
 
 ## Project Structure
 
 ```
 AgentLogger/
 ├── app/                    # Main application package
+│   ├── agents/             # Agent-based architecture components
+│   │   ├── base_agent.py   # Base agent class
+│   │   ├── coordinator_agent.py # Orchestration agent
+│   │   └── analyzer_agent.py # Code analysis agent
 │   ├── api/                # API routes and endpoints
 │   │   └── v1/             # API v1 endpoints
 │   ├── core/               # Core functionality (config, db, middleware)
@@ -56,6 +61,13 @@ AgentLogger/
 ### GitHub Integration
 
 - `GET /api/v1/github/pr/{pr_id}/status`: Check PR status
+
+### Agent-Based Debugging
+
+- `POST /api/v1/agent/agent-debug`: Start an agent-based debugging session
+- `GET /api/v1/agent/agent-debug/{session_id}`: Get debugging session status
+- `POST /api/v1/agent/start`: Start the agent system
+- `POST /api/v1/agent/stop`: Stop the agent system
 
 ### User Management
 
@@ -181,6 +193,7 @@ We've included several scripts to help you test the bug detection and automatic 
 - `test_buggy_code.py`: A Python file with an intentional bug (division by zero)
 - `test_agent_logger.py`: A script to test the full analysis and fix workflow
 - `test_github_pr.py`: A script to directly test the GitHub PR creation
+- `test_agent_debug.py`: A script to test the agent-based debugging system
 
 To test the system:
 
@@ -193,6 +206,9 @@ python test_agent_logger.py test_buggy_code.py "yourusername/your-repo"
 
 # To directly test GitHub PR creation
 python test_github_pr.py "yourusername/your-repo"
+
+# To test the agent-based debugging system
+python test_agent_debug.py
 ```
 
 See `TEST_README.md` for detailed instructions on using these test scripts.
@@ -265,6 +281,56 @@ print(f"Fixed code:\n{fix['fixed_code']}")
 print(f"Explanation:\n{fix['explanation']}")
 ```
 
+### Use Agent-Based Debugging
+
+```python
+import requests
+import time
+
+api_key = "your_api_key"  # Use the API key generated earlier
+headers = {"X-API-Key": api_key}
+
+# Start the agent system
+requests.post("http://localhost:8000/api/v1/agent/start", headers=headers)
+
+# Submit code for debugging
+code = """
+def divide(a, b):
+    return a / b
+
+result = divide(10, 0)
+print(f"Result: {result}")
+"""
+
+response = requests.post(
+    "http://localhost:8000/api/v1/agent/agent-debug",
+    headers=headers,
+    json={
+        "language": "python", 
+        "code": code,
+        "error_message": "ZeroDivisionError: division by zero"
+    }
+)
+
+session_id = response.json()["session_id"]
+
+# Check status periodically
+while True:
+    response = requests.get(
+        f"http://localhost:8000/api/v1/agent/agent-debug/{session_id}",
+        headers=headers
+    )
+    status = response.json()["status"]
+    print(f"Status: {status}")
+    
+    if status == "completed":
+        print("Debugging completed!")
+        print(response.json())
+        break
+        
+    time.sleep(2)
+```
+
 ## Documentation
 
 Comprehensive documentation is available in the `docs` directory:
@@ -275,6 +341,7 @@ Comprehensive documentation is available in the `docs` directory:
 - **API Reference**: [docs/api/index.md](docs/api/index.md)
 - **Development Guide**: [docs/development/index.md](docs/development/index.md)
 - **Testing Guide**: [docs/development/testing.md](docs/development/testing.md)
+- **Agent Architecture**: [docs/development/agent-architecture.md](docs/development/agent-architecture.md)
 - **Deployment Guide**: [docs/guides/deployment.md](docs/guides/deployment.md)
 
 ## License
