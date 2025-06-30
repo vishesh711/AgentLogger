@@ -1,150 +1,244 @@
 # Project Structure
 
-This document explains the structure of the AgentLogger project.
+This document provides an overview of the AgentLogger project structure.
 
 ## Directory Structure
 
 ```
 AgentLogger/
-├── alembic/                  # Database migrations
-│   ├── versions/             # Migration versions
-│   ├── env.py                # Alembic environment configuration
-│   └── script.py.mako        # Migration script template
+├── alembic/                  # Database migration scripts
+│   └── versions/             # Migration versions
 ├── app/                      # Main application package
+│   ├── agents/               # Agent-based architecture components
+│   │   ├── base_agent.py     # Base agent class
+│   │   ├── coordinator_agent.py  # Orchestration agent
+│   │   ├── analyzer_agent.py # Code analysis agent
+│   │   └── fix_generator_agent.py # Fix generation agent
 │   ├── api/                  # API routes and endpoints
-│   │   ├── middleware/       # API middleware
 │   │   └── v1/               # API v1 endpoints
 │   │       ├── endpoints/    # API endpoint modules
-│   │       └── router.py     # API router
+│   │       └── router.py     # API router configuration
 │   ├── core/                 # Core functionality
-│   │   ├── ai/               # AI integration
-│   │   ├── config.py         # Configuration settings
-│   │   ├── db.py             # Database connection
-│   │   ├── middleware.py     # Middleware
-│   │   ├── parsers/          # Code parsers
+│   │   ├── ai/               # AI-related core functionality
+│   │   ├── config.py         # Application configuration
+│   │   ├── db.py             # Database connection and session management
+│   │   ├── middleware.py     # Middleware components
+│   │   ├── parsers/          # Code parsing functionality
 │   │   └── sandbox/          # Code execution sandbox
 │   ├── models/               # Data models
 │   │   ├── db/               # SQLAlchemy database models
-│   │   └── schemas/          # Pydantic schemas
+│   │   └── schemas/          # Pydantic schemas for request/response
 │   ├── services/             # Business logic services
-│   │   ├── ai/               # AI services
-│   │   ├── analysis_service.py  # Analysis service
-│   │   ├── api_key_service.py   # API key service
-│   │   ├── fix_service.py       # Fix service
-│   │   ├── github/              # GitHub integration services
-│   │   ├── github_service.py    # GitHub service
-│   │   └── user_service.py      # User service
-│   ├── utils/                # Utility functions
+│   │   ├── ai/               # AI services (LLM integration)
+│   │   ├── analysis_service.py # Code analysis service
+│   │   ├── api_key_service.py  # API key management
+│   │   ├── fix_service.py      # Fix generation service
+│   │   ├── github/           # GitHub integration services
+│   │   ├── github_service.py   # GitHub service
+│   │   ├── monitoring_service.py # Analytics and monitoring service
+│   │   └── user_service.py     # User management service
+│   ├── utils/                # Utility functions and helpers
 │   │   ├── parsing/          # Code parsing utilities
 │   │   └── sandbox/          # Code execution sandbox utilities
-│   ├── __init__.py           # Package initialization
 │   └── main.py               # Application entry point
+├── cli/                      # Command-line interface
+│   ├── agent_logger_cli.py   # CLI implementation
+│   ├── setup.py              # CLI package setup
+│   └── __init__.py           # CLI package initialization
 ├── docs/                     # Documentation
 │   ├── api/                  # API documentation
-│   ├── guides/               # User guides
-│   └── development/          # Development guides
-├── scripts/                  # Utility scripts
-│   ├── generate_api_key.py   # Script to generate API keys
-│   └── init_db.py            # Script to initialize the database
+│   ├── assets/               # Documentation assets
+│   ├── development/          # Development guides
+│   └── guides/               # User guides
+├── nginx/                    # Nginx configuration for production
+│   └── conf.d/               # Nginx site configurations
 ├── tests/                    # Test suite
-│   ├── conftest.py           # Test configuration
-│   └── test_*.py             # Test modules
-├── .env.sample               # Sample environment variables
-├── .gitignore                # Git ignore file
+│   ├── integration/          # Integration tests
+│   └── unit/                 # Unit tests
+├── .github/                  # GitHub configuration
+│   └── workflows/            # GitHub Actions workflows
 ├── alembic.ini               # Alembic configuration
-├── docker-compose.yml        # Docker Compose configuration
-├── Dockerfile                # Docker configuration
-├── LICENSE                   # License file
-├── Makefile                  # Makefile for common tasks
-├── README.md                 # Project README
-└── requirements.txt          # Python dependencies
+├── docker-compose.yml        # Docker Compose configuration for development
+├── docker-compose.prod.yml   # Docker Compose configuration for production
+├── Dockerfile                # Docker configuration for development
+├── Dockerfile.prod           # Docker configuration for production
+├── requirements.txt          # Python dependencies
+└── README.md                 # Project documentation
 ```
 
 ## Key Components
 
-### API Layer (`app/api/`)
+### Agents
 
-The API layer handles HTTP requests and responses. It is organized as follows:
+The `app/agents/` directory contains the agent-based architecture components:
 
-- `middleware/`: Contains middleware for authentication, rate limiting, etc.
-- `v1/`: Contains API v1 endpoints
-  - `endpoints/`: Contains endpoint modules for different features
-  - `router.py`: Configures the API router
+- `base_agent.py`: Abstract base class for all agents
+- `coordinator_agent.py`: Orchestrates the debugging process
+- `analyzer_agent.py`: Analyzes code for issues
+- `fix_generator_agent.py`: Generates fixes for identified issues
 
-### Core Layer (`app/core/`)
+### API
 
-The core layer contains core functionality used throughout the application:
+The `app/api/` directory contains the API routes and endpoints:
 
-- `ai/`: AI integration components
-- `config.py`: Configuration settings loaded from environment variables
+- `v1/endpoints/`: API endpoint modules
+  - `analyze.py`: Code analysis endpoints
+  - `fix.py`: Fix generation endpoints
+  - `explain.py`: Error explanation endpoints
+  - `patch.py`: Patch generation endpoints
+  - `github.py`: GitHub integration endpoints
+  - `users.py`: User management endpoints
+  - `api_keys.py`: API key management endpoints
+  - `health.py`: Health check endpoint
+  - `agent_debug.py`: Agent-based debugging endpoints
+- `v1/router.py`: API router configuration
+
+### Core
+
+The `app/core/` directory contains core functionality:
+
+- `config.py`: Application configuration
 - `db.py`: Database connection and session management
-- `middleware.py`: Application middleware
-- `parsers/`: Code parsers for different programming languages
-- `sandbox/`: Code execution sandbox
+- `middleware.py`: Middleware components (authentication, rate limiting, analytics)
 
-### Models Layer (`app/models/`)
+### Models
 
-The models layer defines data models and schemas:
+The `app/models/` directory contains data models:
 
 - `db/`: SQLAlchemy database models
-  - `analysis.py`: Analysis model
+  - `base.py`: Base model class
+  - `user.py`: User model
   - `api_key.py`: API key model
-  - `base.py`: Base model with common fields
+  - `analysis.py`: Analysis model
   - `fix.py`: Fix model
   - `github.py`: GitHub integration model
-  - `user.py`: User model
 - `schemas/`: Pydantic schemas for request/response validation
-  - `analysis.py`: Analysis schemas
-  - `api_key.py`: API key schemas
-  - `fix.py`: Fix schemas
   - `user.py`: User schemas
+  - `api_key.py`: API key schemas
+  - `analysis.py`: Analysis schemas
+  - `fix.py`: Fix schemas
+  - `explain.py`: Error explanation schemas
+  - `patch.py`: Patch generation schemas
 
-### Services Layer (`app/services/`)
+### Services
 
-The services layer contains business logic:
+The `app/services/` directory contains business logic services:
 
-- `ai/`: AI services
-  - `groq_client.py`: Groq API client
+- `ai/`: AI services (LLM integration)
+  - `groq_client.py`: Client for interacting with Groq LLM API
 - `analysis_service.py`: Code analysis service
 - `api_key_service.py`: API key management service
-- `fix_service.py`: Code fixing service
-- `github/`: GitHub integration services
-- `github_service.py`: GitHub service
+- `fix_service.py`: Fix generation service
+- `github_service.py`: GitHub integration service
+- `monitoring_service.py`: Analytics and monitoring service
 - `user_service.py`: User management service
 
-### Utils Layer (`app/utils/`)
+### Utils
 
-The utils layer contains utility functions:
+The `app/utils/` directory contains utility functions and helpers:
 
 - `parsing/`: Code parsing utilities
   - `base_parser.py`: Base parser class
-  - `javascript_parser.py`: JavaScript parser
-  - `parser_factory.py`: Parser factory
-  - `python_parser.py`: Python parser
+  - `python_parser.py`: Python code parser
+  - `javascript_parser.py`: JavaScript code parser
+  - `parser_factory.py`: Factory for creating parsers
 - `sandbox/`: Code execution sandbox utilities
-  - `code_runner.py`: Code execution runner
+  - `code_runner.py`: Code execution utilities
 
-### Scripts (`scripts/`)
+### CLI
 
-The scripts directory contains utility scripts:
+The `cli/` directory contains the command-line interface:
 
-- `generate_api_key.py`: Script to generate API keys
-- `init_db.py`: Script to initialize the database
+- `agent_logger_cli.py`: CLI implementation
+- `setup.py`: CLI package setup
+- `__init__.py`: CLI package initialization
 
-### Tests (`tests/`)
+### Tests
 
-The tests directory contains the test suite:
+The `tests/` directory contains the test suite:
 
-- `conftest.py`: Test configuration and fixtures
-- `test_*.py`: Test modules for different features
+- `integration/`: Integration tests
+- `unit/`: Unit tests
+- `conftest.py`: Test fixtures and configuration
 
-## Module Dependencies
+### Documentation
 
-The dependencies between modules are as follows:
+The `docs/` directory contains documentation:
 
-1. API endpoints depend on services
-2. Services depend on models and utils
-3. Models depend on core components
-4. Utils depend on core components
+- `api/`: API documentation
+- `development/`: Development guides
+- `guides/`: User guides
 
-This layered architecture helps maintain separation of concerns and makes the codebase easier to understand and maintain. 
+### Deployment
+
+- `docker-compose.yml`: Docker Compose configuration for development
+- `docker-compose.prod.yml`: Docker Compose configuration for production
+- `Dockerfile`: Docker configuration for development
+- `Dockerfile.prod`: Docker configuration for production
+- `nginx/`: Nginx configuration for production
+
+## Design Patterns
+
+### Dependency Injection
+
+The application uses FastAPI's dependency injection system for:
+- Database sessions
+- Authentication
+- Service dependencies
+
+### Repository Pattern
+
+The application uses the repository pattern for data access:
+- Service layers handle business logic
+- Database models handle data persistence
+- Pydantic schemas handle data validation
+
+### Factory Pattern
+
+The application uses the factory pattern for:
+- Parser creation based on language
+- Agent creation based on task
+
+### Agent-Based Architecture
+
+The application uses an agent-based architecture for debugging:
+- Coordinator agent orchestrates the debugging process
+- Analyzer agent analyzes code for issues
+- Fix generator agent generates fixes for identified issues
+
+## Key Workflows
+
+### Code Analysis Workflow
+
+1. User submits code for analysis
+2. Code is parsed and analyzed
+3. Issues are identified and stored
+4. Analysis results are returned to the user
+
+### Fix Generation Workflow
+
+1. User requests a fix for an identified issue
+2. Fix generator agent creates a fix
+3. Fix is validated and stored
+4. Fix is returned to the user
+
+### Error Explanation Workflow
+
+1. User submits an error message and code context
+2. Error is analyzed by the AI
+3. Multi-level explanations are generated
+4. Explanations are returned to the user
+
+### Patch Generation Workflow
+
+1. User submits code and issue description
+2. Patch generator creates a unified diff patch
+3. Patch is validated
+4. Patch is returned to the user
+
+### GitHub Integration Workflow
+
+1. User requests a GitHub PR for a fix
+2. GitHub service creates a branch and commits the fix
+3. GitHub service creates a PR
+4. PR details are returned to the user 

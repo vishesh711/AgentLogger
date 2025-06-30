@@ -8,6 +8,31 @@ from sqlalchemy.orm import Session
 from app.models.db.api_key import ApiKey
 from app.models.db.user import User
 from app.models.schemas.api_key import ApiKeyCreate, ApiKeyResponse, ApiKeyUpdate
+from app.core.db import get_db
+
+
+async def validate_api_key(api_key: str) -> Optional[str]:
+    """
+    Validate an API key and return the user ID if valid
+    
+    This is a convenience function that creates a database session
+    and calls verify_api_key_service
+    
+    Args:
+        api_key: API key to validate
+        
+    Returns:
+        User ID if the key is valid, None otherwise
+    """
+    # Get database session
+    db = next(get_db())
+    
+    try:
+        # Verify the API key
+        return await verify_api_key_service(db, api_key)
+    finally:
+        # Close the database session
+        db.close()
 
 
 async def create_api_key(

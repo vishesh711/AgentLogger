@@ -1,53 +1,56 @@
 version: '3.8'
 
 services:
-  app:
-    build: .
-    container_name: agentlogger-api
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    volumes:
-      - .:/app
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - agentlogger-network
+    environment:
+      - VITE_API_BASE_URL=/api/v1
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/agentlogger
+      - GROQ_API_KEY=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
+      - GROQ_MODEL=llama3-70b-8192
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - redis
-    environment:
-      - POSTGRES_SERVER=db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=agentlogger
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - USE_REDIS=true
-      - USE_DOCKER_SANDBOX=true
+      db:
+        condition: service_healthy
     networks:
       - agentlogger-network
 
   db:
-    image: postgres:15
-    container_name: agentlogger-db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
+    image: postgres:15-alpine
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=agentlogger
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - agentlogger-network
     ports:
       - "5432:5432"
-    networks:
-      - agentlogger-network
-
-  redis:
-    image: redis:7
-    container_name: agentlogger-redis
-    ports:
-      - "6379:6379"
-    networks:
-      - agentlogger-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 networks:
   agentlogger-network:
+    driver: bridge
 
 volumes:
   postgres_data: 

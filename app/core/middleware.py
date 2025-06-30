@@ -1,6 +1,6 @@
 import time
 from collections import defaultdict
-from typing import Callable, Dict, Tuple
+from typing import Callable, Dict, Tuple, Any, Optional
 
 from fastapi import HTTPException, Request, Response, FastAPI, status, Depends
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_429_TOO_MANY_REQUESTS
@@ -9,7 +9,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
 from app.core.db import get_db
-from app.services.api_key_service import verify_api_key_service
+from app.services.api_key_service import verify_api_key_service, validate_api_key
+from app.services.monitoring_service import monitoring_service
 
 # Simple in-memory rate limiter
 class RateLimiter:
@@ -56,7 +57,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         client_id = request.headers.get("X-API-Key") or request.client.host
         
         # Skip rate limiting for certain paths
-        if request.url.path == "/api/v1/health":
+        if request.url.path == "/api/v1/health/health":
             return await call_next(request)
         
         # Check rate limit
@@ -88,61 +89,103 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     """
-    Middleware for API key authentication.
+    Middleware for API key authentication
     """
     def __init__(self, app: FastAPI):
         super().__init__(app)
-        # Paths that don't require API key
-        self.public_paths = {
-            "/api/v1/health", 
-            "/docs", 
-            "/redoc", 
-            "/openapi.json",
-            "/api/v1/openapi.json"
-        }
-        
+        self.public_paths = [
+            "/api/v1/docs",
+            "/api/v1/redoc",
+            "/api/v1/openapi.json",
+            "/api/v1/health/health",
+            "/api/v1/users",
+            "/",
+        ]
+    
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Skip API key check for public paths
-        path = request.url.path
-        if any(path.startswith(public_path) for public_path in self.public_paths) or \
-           any(path.endswith(public_path) for public_path in ["/openapi.json"]):
-            return await call_next(request)
+        # Skip authentication for public paths
+        for path in self.public_paths:
+            if request.url.path.endswith(path):
+                return await call_next(request)
         
-        # Check for API key
+        # Get API key from header
         api_key = request.headers.get("X-API-Key")
         if not api_key:
             return JSONResponse(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                content={"detail": "Missing API key"}
+                status_code=401,
+                content={"detail": "API key required"},
             )
         
-        # Get database session
-        db = next(get_db())
-        
-        # Verify API key
-        user_id = await verify_api_key_service(db, api_key)
+        # Validate API key
+        user_id = await validate_api_key(api_key)
         if not user_id:
             return JSONResponse(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                content={"detail": "Invalid API key"}
+                status_code=401,
+                content={"detail": "Invalid API key"},
             )
         
-        # Store user ID in request state
+        # Store user_id in request state
         request.state.user_id = user_id
         
+        # Continue with the request
         return await call_next(request)
 
 
-def add_middleware(app: FastAPI) -> None:
+class AnalyticsMiddleware(BaseHTTPMiddleware):
     """
-    Add all middleware to the FastAPI application.
+    Middleware for tracking API usage
     """
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # Skip analytics for non-API paths
+        if not request.url.path.startswith("/api/v1/"):
+            return await call_next(request)
+        
+        # Start timer
+        start_time = time.time()
+        
+        # Process request
+        response = await call_next(request)
+        
+        # Calculate duration
+        duration_ms = (time.time() - start_time) * 1000
+        
+        # Get endpoint and status code
+        endpoint = request.url.path
+        status_code = response.status_code
+        
+        # Get user_id if available
+        user_id = getattr(request.state, "user_id", "anonymous")
+        
+        # Track API call
+        metadata = {
+            "method": request.method,
+            "query_params": dict(request.query_params),
+        }
+        
+        await monitoring_service.track_api_call(
+            endpoint=endpoint,
+            user_id=user_id,
+            duration_ms=duration_ms,
+            status_code=status_code,
+            metadata=metadata
+        )
+        
+        return response
+
+
+def add_middlewares(app: FastAPI) -> None:
+    """
+    Add middlewares to the FastAPI app
+    """
+    # Add API key middleware
+    app.add_middleware(APIKeyMiddleware)
+    
+    # Add analytics middleware
+    app.add_middleware(AnalyticsMiddleware)
+    
     # Add rate limiting middleware
     if settings.RATE_LIMIT_PER_MINUTE > 0:
         app.add_middleware(RateLimitMiddleware)
-    
-    # Add API key middleware
-    app.add_middleware(APIKeyMiddleware)
     
     # Add timing middleware for debugging
     @app.middleware("http")

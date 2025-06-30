@@ -1,167 +1,263 @@
 # Installation Guide
 
-This guide covers the installation of AgentLogger in different environments.
+This guide covers how to install AgentLogger for development and production use.
 
-## Local Development Installation
+## Prerequisites
 
-### Prerequisites
-
-- Python 3.11 or later
-- PostgreSQL 13 or later
-- Docker (optional, for sandbox execution)
+- Python 3.11+
+- Docker and Docker Compose (recommended)
 - Git
 
-### Step 1: Clone the Repository
+## Installation Options
+
+There are several ways to install and run AgentLogger:
+
+1. Using Docker (recommended)
+2. Manual installation
+3. CLI installation
+
+## Using Docker
+
+### Development Setup
+
+1. Clone the repository:
 
 ```bash
 git clone https://github.com/yourusername/agentlogger.git
 cd agentlogger
 ```
 
-### Step 2: Create a Virtual Environment
+2. Create a `.env` file:
+
+```bash
+cp .env.sample .env
+# Edit .env with your configuration
+```
+
+3. Start the services:
+
+```bash
+docker-compose up -d
+```
+
+4. Generate an API key:
+
+```bash
+docker-compose exec api python scripts/generate_api_key.py
+```
+
+The API will be available at http://localhost:8000.
+
+### Production Setup
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/yourusername/agentlogger.git
+cd agentlogger
+```
+
+2. Create a production `.env` file:
+
+```bash
+cp .env.sample .env.prod
+# Edit .env.prod with your production configuration
+```
+
+3. Configure SSL certificates:
+
+```bash
+mkdir -p nginx/certs
+# Copy your SSL certificates to nginx/certs
+cp /path/to/your/fullchain.pem nginx/certs/
+cp /path/to/your/privkey.pem nginx/certs/
+```
+
+4. Start the production services:
+
+```bash
+docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d
+```
+
+5. Generate an API key:
+
+```bash
+docker-compose -f docker-compose.prod.yml exec api python scripts/generate_api_key.py
+```
+
+The API will be available at https://your-domain.com.
+
+## Manual Installation
+
+### Development Setup
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/yourusername/agentlogger.git
+cd agentlogger
+```
+
+2. Create and activate a virtual environment:
 
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-### Step 3: Install Dependencies
+3. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Step 4: Set Up Environment Variables
-
-Create a `.env` file in the project root directory:
+4. Create a `.env` file:
 
 ```bash
-cp setup_groq_key.txt .env
+cp .env.sample .env
+# Edit .env with your configuration
 ```
 
-Edit the `.env` file to include your specific configuration, especially:
-
-- Database connection details
-- Groq API key
-- GitHub access token (if using GitHub integration)
-- Secret key (generate a secure random string)
-
-### Step 5: Initialize the Database
-
-Make sure PostgreSQL is running, then run:
+5. Run database migrations:
 
 ```bash
-# Run database migrations
 alembic upgrade head
-
-# Initialize the database with initial data
-python scripts/init_db.py
 ```
 
-### Step 6: Start the Development Server
+6. Generate an API key:
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+python scripts/generate_api_key.py
 ```
 
-The API should now be accessible at http://localhost:8000. You can access the API documentation at http://localhost:8000/docs.
-
-## Docker Installation
-
-### Prerequisites
-
-- Docker
-- Docker Compose
-
-### Step 1: Clone the Repository
+7. Start the development server:
 
 ```bash
+uvicorn app.main:app --reload
+```
+
+The API will be available at http://localhost:8000.
+
+## CLI Installation
+
+The AgentLogger CLI provides a command-line interface for interacting with the AgentLogger API.
+
+### Using pip
+
+```bash
+pip install agent-logger-cli
+```
+
+### From Source
+
+```bash
+# Clone the repository
 git clone https://github.com/yourusername/agentlogger.git
 cd agentlogger
+
+# Install the CLI
+pip install -e cli/
 ```
 
-### Step 2: Set Up Environment Variables
+### CLI Configuration
 
-Create a `.env` file in the project root directory:
+After installing the CLI, you need to configure it with your API key:
 
 ```bash
-cp setup_groq_key.txt .env
+agent-logger configure --api-key YOUR_API_KEY
 ```
 
-Edit the `.env` file to include your specific configuration. For Docker, the database host should be set to the service name:
-
-```
-POSTGRES_SERVER=db
-```
-
-### Step 3: Build and Start the Docker Containers
+By default, the CLI will connect to the AgentLogger API at `http://localhost:8000/v1`. If you want to use a different API endpoint, you can specify it during configuration:
 
 ```bash
-docker-compose up -d
+agent-logger configure --api-key YOUR_API_KEY --api-url https://api.yourdomain.com/v1
 ```
 
-This will start:
-- The AgentLogger API service
-- PostgreSQL database
-- Redis (for caching)
+## Verifying the Installation
 
-### Step 4: Initialize the Database
+### API Verification
+
+To verify that the API is running correctly, you can use the health check endpoint:
 
 ```bash
-docker-compose exec app python scripts/init_db.py
+curl http://localhost:8000/v1/health
 ```
 
-The API should now be accessible at http://localhost:8000. You can access the API documentation at http://localhost:8000/docs.
+You should see a response like:
 
-## Production Deployment
+```json
+{
+  "status": "ok",
+  "version": "0.1.0"
+}
+```
 
-For production deployment, we recommend:
+### CLI Verification
 
-1. Using a production-ready ASGI server like Uvicorn behind Nginx
-2. Setting up proper SSL/TLS certificates
-3. Configuring a production database with proper backups
-4. Setting up monitoring and logging
+To verify that the CLI is installed correctly, you can use the version command:
 
-See the [Deployment Guide](deployment.md) for detailed instructions on production deployment.
+```bash
+agent-logger version
+```
+
+You should see a response like:
+
+```
+AgentLogger CLI v0.1.0
+```
+
+## Next Steps
+
+After installing AgentLogger, you can:
+
+- [Configure AgentLogger](configuration.md) for your specific needs
+- [Get started with the API](../api/index.md)
+- [Use the CLI](cli.md) to interact with the API
+- [Deploy AgentLogger](deployment.md) to production
 
 ## Troubleshooting
 
-### Database Connection Issues
-
-If you encounter database connection issues:
-
-1. Make sure PostgreSQL is running
-2. Verify the database connection details in your `.env` file
-3. Check that the database exists and the user has appropriate permissions
-
-```bash
-# Create database manually if needed
-createdb agentlogger
-```
-
-### Python Package Issues
-
-If you encounter issues with Python packages:
-
-```bash
-# Update pip
-pip install --upgrade pip
-
-# Reinstall requirements
-pip install -r requirements.txt --force-reinstall
-```
-
 ### Docker Issues
 
-If you encounter issues with Docker:
+If you're having trouble with Docker:
 
 ```bash
-# Stop and remove containers
-docker-compose down
+# Check the logs
+docker-compose logs
 
-# Remove volumes to start fresh
-docker-compose down -v
+# Rebuild the containers
+docker-compose build --no-cache
+```
 
-# Rebuild and start
-docker-compose up -d --build
+### Database Issues
+
+If you're having trouble with the database:
+
+```bash
+# Check the database connection
+docker-compose exec db psql -U postgres -d agentlogger -c "SELECT 1"
+
+# Run migrations manually
+docker-compose exec api alembic upgrade head
+```
+
+### API Key Issues
+
+If you're having trouble with API keys:
+
+```bash
+# Generate a new API key
+docker-compose exec api python scripts/generate_api_key.py
+```
+
+### CLI Issues
+
+If you're having trouble with the CLI:
+
+```bash
+# Check the CLI configuration
+cat ~/.agentlogger/config.json
+
+# Reset the CLI configuration
+agent-logger configure --reset
 ``` 

@@ -137,47 +137,104 @@ class GroqClient:
         except (json.JSONDecodeError, KeyError) as e:
             raise ValueError(f"Failed to parse LLM response: {str(e)}")
     
-    async def explain_error(self, error_message: str, code: str, language: str) -> str:
+    async def explain_error(self, error_message: str, code: str, language: str, user_level: str = "intermediate") -> Dict[str, Any]:
         """
-        Explain an error message in simple terms
+        Explain an error message with multiple levels of detail
+        
+        Args:
+            error_message: The error message or stack trace
+            code: The code that generated the error
+            language: The programming language of the code
+            user_level: User experience level (beginner, intermediate, advanced)
+            
+        Returns:
+            Dictionary with explanations at different levels and learning resources
         """
-        prompt = self._get_error_explanation_prompt(error_message, code, language)
+        prompt = self._get_error_explanation_prompt(error_message, code, language, user_level)
         
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": "You are an expert at explaining code errors in simple terms."},
+                {"role": "system", "content": "You are an expert at explaining code errors at multiple levels of detail."},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.3,
-            "max_tokens": 2000
+            "max_tokens": 2500,
+            "response_format": {"type": "json_object"}
         }
         
         response = await self._call_api("chat/completions", payload)
-        return response["choices"][0]["message"]["content"]
+        content = response["choices"][0]["message"]["content"]
+        
+        try:
+            result = json.loads(content)
+            return {
+                "simple": result.get("simple", ""),
+                "detailed": result.get("detailed", ""),
+                "technical": result.get("technical", ""),
+                "learning_resources": result.get("learning_resources", []),
+                "related_concepts": result.get("related_concepts", [])
+            }
+        except (json.JSONDecodeError, KeyError) as e:
+            # If JSON parsing fails, create a fallback response
+            return {
+                "simple": "Failed to parse the explanation response.",
+                "detailed": f"Error: {str(e)}",
+                "technical": content,
+                "learning_resources": [],
+                "related_concepts": []
+            }
     
-    async def _call_api(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def generate_patch(
+        self, 
+        original_code: str, 
+        language: str, 
+        issue_description: str,
+        context: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
-        Call the Groq API
+        Generate a patch for a code issue
+        
+        Args:
+            original_code: The original code with the issue
+            language: The programming language of the code
+            issue_description: Description of the issue to fix
+            context: Additional context about the code or issue
+            
+        Returns:
+            Dictionary with the patch, explanation, and whether it can be auto-applied
         """
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+        prompt = self._get_patch_prompt(original_code, language, issue_description, context)
+        
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": "You are an expert at generating patches for code issues."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2,
+            "max_tokens": 4000,
+            "response_format": {"type": "json_object"}
         }
         
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/{endpoint}",
-                headers=headers,
-                json=payload,
-                timeout=60.0
-            )
+        response = await self._call_api("chat/completions", payload)
+        content = response["choices"][0]["message"]["content"]
+        
+        try:
+            result = json.loads(content)
+            return {
+                "patch": result.get("patch", ""),
+                "explanation": result.get("explanation", ""),
+                "can_auto_apply": result.get("can_auto_apply", False)
+            }
+        except (json.JSONDecodeError, KeyError) as e:
+            # If JSON parsing fails, create a fallback response
+            return {
+                "patch": "",
+                "explanation": f"Failed to generate patch: {str(e)}",
+                "can_auto_apply": False
+            }
             
-            if response.status_code != 200:
-                raise Exception(f"Groq API error: {response.status_code} - {response.text}")
-            
-            return response.json()
-    
     def _get_analysis_prompt(self, code: str, language: str) -> str:
         """
         Generate the prompt for code analysis
@@ -238,28 +295,132 @@ class GroqClient:
         }}
         """
     
-    def _get_error_explanation_prompt(self, error_message: str, code: str, language: str) -> str:
+    def _get_error_explanation_prompt(self, error_message: str, code: str, language: str, user_level: str = "intermediate") -> str:
         """
-        Generate the prompt for explaining an error message
+        Generate the prompt for explaining an error message with multiple levels of detail
+        
+        Args:
+            error_message: The error message or stack trace
+            code: The code that generated the error
+            language: The programming language of the code
+            user_level: User experience level (beginner, intermediate, advanced)
+            
+        Returns:
+            Prompt string for the LLM
         """
         return f"""
-        Explain the following error message in simple terms:
+        I have the following error in my {language} code:
         
         ```
         {error_message}
         ```
         
-        The error occurred in this {language} code:
+        Here's the code that generated the error:
         
         ```{language}
         {code}
         ```
         
-        Please provide:
-        1. A simple explanation of what the error means
-        2. The likely cause of the error
-        3. How to fix it
+        I consider myself a {user_level} level programmer.
+        
+        Please provide a detailed explanation of this error with the following:
+        
+        1. A simple explanation for beginners
+        2. A more detailed explanation with context
+        3. A technical explanation with programming concepts
+        4. Relevant learning resources (articles, documentation, tutorials)
+        5. Related programming concepts I should understand
+        
+        Format your response as a JSON object with the following structure:
+        {{
+            "simple": "Simple explanation here",
+            "detailed": "More detailed explanation here",
+            "technical": "Technical explanation with programming concepts",
+            "learning_resources": [
+                {{
+                    "title": "Resource title",
+                    "url": "https://example.com",
+                    "description": "Brief description",
+                    "resource_type": "article|video|documentation"
+                }}
+            ],
+            "related_concepts": ["concept1", "concept2"]
+        }}
         """
+    
+    def _get_patch_prompt(
+        self, 
+        original_code: str, 
+        language: str, 
+        issue_description: str,
+        context: Optional[str] = None
+    ) -> str:
+        """
+        Generate the prompt for patch generation
+        
+        Args:
+            original_code: The original code with the issue
+            language: The programming language of the code
+            issue_description: Description of the issue to fix
+            context: Additional context about the code or issue
+            
+        Returns:
+            Prompt string for the LLM
+        """
+        prompt = f"""
+        Generate a patch for the following {language} code:
+        
+        ```{language}
+        {original_code}
+        ```
+        
+        Issue description:
+        {issue_description}
+        """
+        
+        if context:
+            prompt += f"""
+            
+            Additional context:
+            {context}
+            """
+            
+        prompt += """
+        
+        Please generate a patch in unified diff format that fixes the issue.
+        Also provide an explanation of what the patch does and whether it can be automatically applied.
+        
+        Format your response as a JSON object with the following structure:
+        {
+            "patch": "--- original.py\\n+++ fixed.py\\n@@ -10,7 +10,7 @@\\n...",
+            "explanation": "This patch fixes the issue by...",
+            "can_auto_apply": true|false
+        }
+        """
+        
+        return prompt
+    
+    async def _call_api(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Call the Groq API
+        """
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self.base_url}/{endpoint}",
+                headers=headers,
+                json=payload,
+                timeout=60.0
+            )
+            
+            if response.status_code != 200:
+                raise Exception(f"Groq API error: {response.status_code} - {response.text}")
+            
+            return response.json()
 
 
 async def get_fix_from_groq(

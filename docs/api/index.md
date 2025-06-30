@@ -1,122 +1,163 @@
-# API Reference
+# API Documentation
 
-Welcome to the AgentLogger API reference. This section provides detailed information about the available API endpoints, request/response formats, and authentication.
-
-## Base URL
-
-All API endpoints are prefixed with `/api/v1`.
-
-## Authentication
-
-All API endpoints (except for health check and documentation) require authentication using an API key. Include your API key in the `X-API-Key` header:
-
-```
-X-API-Key: your-api-key-here
-```
+Welcome to the AgentLogger API documentation. This guide provides information on how to use the AgentLogger API to analyze code, fix issues, explain errors, and generate patches.
 
 ## API Endpoints
 
-### Health Check
+The API is organized into the following endpoints:
 
-- [Health Check](health.md): Check if the API is running
-
-### Code Analysis
-
-- [Code Analysis](analyze.md): Submit code for analysis and retrieve results
-
-### Code Fixing
-
-- [Code Fixing](fix.md): Request fixes for code issues and retrieve results
-
-### Error Explanation
-
-- [Error Explanation](explain.md): Get explanations for error messages
-
-### GitHub Integration
-
+- [Analyze](analyze.md): Analyze code for issues
+- [Fix](fix.md): Generate fixes for identified issues
+- [Explain](explain.md): Get multi-level explanations for error messages
+- [Patch](patch.md): Generate patches in unified diff format
 - [GitHub Integration](github.md): Create pull requests with fixes
+- [API Keys](api-keys.md): Manage API keys
+- [Health](health.md): Check API health
 
-### User Management
+## Base URL
 
-- [User Management](users.md): Manage users
+When running with Docker Compose (the recommended setup) nginx proxies the backend, so the base URL is:
 
-### API Key Management
-
-- [API Key Management](api-keys.md): Manage API keys
-
-## Response Format
-
-All API responses follow a consistent format:
-
-```json
-{
-  "success": true,
-  "data": { ... },
-  "message": "Operation successful",
-  "errors": null
-}
+```
+http://localhost/api/v1
 ```
 
-For error responses:
+If you decide to bypass nginx and hit the backend container directly, use `http://localhost:8000/api/v1` and **remember to include the `X-API-Key` header** even for the `/docs` Swagger UI.
 
-```json
-{
-  "success": false,
-  "data": null,
-  "message": "Error message",
-  "errors": [
-    {
-      "code": "error_code",
-      "detail": "Detailed error message"
-    }
-  ]
-}
+## Authentication
+
+All API requests require an API key. You can generate an API key using the `/api/v1/api-keys` endpoint or the `scripts/generate_api_key.py` script.
+
+To authenticate your requests, include your API key in the `X-API-Key` header:
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/analyze" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "your code here",
+    "language": "python"
+  }'
 ```
 
 ## Rate Limiting
 
-The API is rate-limited to protect the service. By default, the limit is 60 requests per minute per API key. Rate limit information is included in the response headers:
+The API has rate limiting to prevent abuse. By default, each API key is limited to 60 requests per minute. If you exceed this limit, you will receive a 429 Too Many Requests response.
 
-```
-X-RateLimit-Limit: 60
-X-RateLimit-Remaining: 59
-X-RateLimit-Reset: 1620000000
-```
+## Error Handling
 
-## Pagination
+The API uses standard HTTP status codes to indicate success or failure:
 
-List endpoints support pagination using the following query parameters:
+- `200 OK`: The request was successful
+- `400 Bad Request`: The request was invalid
+- `401 Unauthorized`: The API key is invalid or missing
+- `404 Not Found`: The requested resource was not found
+- `429 Too Many Requests`: The rate limit was exceeded
+- `500 Internal Server Error`: An error occurred on the server
 
-- `page`: Page number (default: 1)
-- `limit`: Number of items per page (default: 10, max: 100)
-
-Pagination information is included in the response:
+Error responses include a JSON object with a `detail` field that provides more information about the error:
 
 ```json
 {
-  "success": true,
-  "data": { ... },
-  "message": "Operation successful",
-  "pagination": {
-    "total": 100,
-    "page": 1,
-    "limit": 10,
-    "pages": 10
-  }
+  "detail": "Invalid API key"
 }
 ```
 
-## Error Codes
+## Versioning
 
-| Code | Description |
-|------|-------------|
-| `authentication_error` | Invalid or missing API key |
-| `validation_error` | Invalid request parameters |
-| `not_found` | Resource not found |
-| `rate_limit_exceeded` | Rate limit exceeded |
-| `internal_error` | Internal server error |
-| `bad_request` | Bad request |
+The API is versioned to ensure backward compatibility. The current version is `v1`. All endpoints are prefixed with `/api/v1/`.
 
-## OpenAPI Documentation
+## Monitoring and Analytics
 
-The full OpenAPI documentation is available at `/docs` when running the API server. 
+The API includes monitoring and analytics to track usage and performance. This information is used to improve the API and identify issues.
+
+## Sandbox Execution
+
+Some endpoints may execute code in a secure sandbox to validate fixes or reproduce issues. The sandbox is isolated from the rest of the system and has limited resources.
+
+## Examples
+
+### Analyze Code
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/analyze" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "def divide(a, b):\n    return a / b\n\nresult = divide(10, 0)",
+    "language": "python"
+  }'
+```
+
+### Fix Issues
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/fix" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "analysis_id": "analysis-id-from-analyze-endpoint",
+    "code": "def divide(a, b):\n    return a / b\n\nresult = divide(10, 0)",
+    "language": "python"
+  }'
+```
+
+### Explain Errors
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/explain" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "error_trace": "ZeroDivisionError: division by zero",
+    "code_context": "def divide(a, b):\n    return a / b\n\nresult = divide(10, 0)",
+    "language": "python",
+    "user_level": "beginner"
+  }'
+```
+
+### Generate Patches
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/patch" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "original_code": "def divide(a, b):\n    return a / b\n\nresult = divide(10, 0)",
+    "language": "python",
+    "issue_description": "Division by zero error"
+  }'
+```
+
+### Manage API Keys
+
+```bash
+# List all API keys
+curl -X GET "http://localhost:8000/api/v1/api-keys" \
+  -H "X-API-Key: your-api-key"
+
+# Create a new API key
+curl -X POST "http://localhost:8000/api/v1/api-keys" \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My API Key"
+  }'
+
+# Delete an API key
+curl -X DELETE "http://localhost:8000/api/v1/api-keys/{key_id}" \
+  -H "X-API-Key: your-api-key"
+```
+
+### Check API Health
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/health" \
+  -H "X-API-Key: your-api-key"
+```
+
+## Next Steps
+
+- [Getting Started Guide](../guides/getting-started.md): Learn how to get started with the AgentLogger API
+- [CLI Tool](../guides/cli.md): Learn how to use the AgentLogger CLI tool
+- [Configuration Guide](../guides/configuration.md): Learn how to configure the AgentLogger API 

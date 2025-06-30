@@ -4,17 +4,20 @@ from fastapi import APIRouter
 api_router = APIRouter()
 
 # Import and include all endpoint routers
-from app.api.v1.endpoints import health
-from app.api.v1.endpoints import users
-from app.api.v1.endpoints import api_keys
-from app.api.v1.endpoints import analyze
-from app.api.v1.endpoints import fix
-from app.api.v1.endpoints import explain
-from app.api.v1.endpoints import github
-from app.api.v1.endpoints import agent_debug
+from app.api.v1.endpoints import (
+    analyze,
+    fix,
+    explain,
+    patch,
+    health,
+    users,
+    api_keys,
+    github,
+    agent_debug,
+)
 
 # Health check endpoint
-api_router.include_router(health.router, tags=["health"])
+api_router.include_router(health.router, prefix="/health", tags=["health"])
 
 # User management
 api_router.include_router(users.router, prefix="/users", tags=["users"])
@@ -35,7 +38,7 @@ api_router.include_router(fix.router, prefix="/fix", tags=["fix"])
 api_router.include_router(github.router, prefix="/github", tags=["github"])
 
 # Agent-based debugging
-api_router.include_router(agent_debug.router, prefix="/agent", tags=["agent"])
+api_router.include_router(agent_debug.router, prefix="/agent-debug", tags=["agent-debug"])
 
 # Try to import other endpoints, but don't fail if they don't exist yet
 try:
@@ -71,5 +74,11 @@ except ImportError:
 try:
     from app.api.v1.endpoints import github
     api_router.include_router(github.router, prefix="/github", tags=["github"])
+except ImportError:
+    pass
+
+try:
+    from app.api.v1.endpoints import patch
+    api_router.include_router(patch.router, prefix="/patch", tags=["patch"])
 except ImportError:
     pass 

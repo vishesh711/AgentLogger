@@ -1,51 +1,62 @@
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from typing import Dict, Optional
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
-from starlette.status import HTTP_400_BAD_REQUEST
+from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 
 from app.core.db import get_db
 from app.services.ai.groq_client import GroqClient
+from app.core.config import settings
+from app.models.schemas.explain import ErrorExplanationRequest, ErrorExplanationResponse
 
 router = APIRouter()
 
 
-class ErrorExplanationRequest(BaseModel):
-    error_message: str = Field(..., description="The error message to explain")
-    code: str = Field(..., description="The code that generated the error")
-    language: str = Field(..., description="The programming language of the code")
-
-
-class ErrorExplanationResponse(BaseModel):
-    explanation: str = Field(..., description="Simple explanation of the error")
-
-
 @router.post("/", response_model=ErrorExplanationResponse)
 async def explain_error(
-    request: ErrorExplanationRequest,
+    request: Request,
+    explanation_data: ErrorExplanationRequest,
     db: Session = Depends(get_db),
 ):
     """
-    Explain an error message in simple terms
+    Get a detailed explanation of an error message with different levels of detail
+    based on the user's experience level.
     
-    This endpoint takes an error message, the code that generated it,
-    and the programming language, and returns a simple explanation
-    of what the error means and how to fix it.
+    This endpoint takes an error message, code context, and user experience level,
+    and returns explanations tailored to that level along with relevant resources.
     """
     try:
-        # Initialize the Groq client
+        # Get user_id from request state (set by the API key middleware)
+        user_id = request.state.user_id
+        
+        # Initialize Groq client
         groq_client = GroqClient()
         
-        # Get the explanation
+        # Generate the explanation
         explanation = await groq_client.explain_error(
-            request.error_message,
-            request.code,
-            request.language,
+            error_message=explanation_data.error_trace,
+            code=explanation_data.code_context,
+            language=explanation_data.language,
+            user_level=explanation_data.user_level
         )
         
-        return ErrorExplanationResponse(explanation=explanation)
+        # Return the explanation response
+        return ErrorExplanationResponse(
+            explanation={
+                "simple": explanation.get("simple", ""),
+                "detailed": explanation.get("detailed", ""),
+                "technical": explanation.get("technical", "")
+            },
+            learning_resources=explanation.get("learning_resources", []),
+            related_concepts=explanation.get("related_concepts", [])
+        )
     
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Failed to explain error: {str(e)}",
+            detail=str(e),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while generating the explanation: {str(e)}"
         ) 

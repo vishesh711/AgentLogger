@@ -1,349 +1,99 @@
-# AgentLogger API Platform
+# AgentLogger - AI-Powered Debugging Tool
 
-AgentLogger is an AI-powered debugging API service that helps developers detect, analyze, and fix code bugs using LLM agents.
+AgentLogger is an advanced debugging tool that uses AI-powered agents to analyze, explain, and fix code issues automatically. The system leverages a multi-agent architecture to provide comprehensive debugging assistance.
 
-## Features
+## Core Concept
 
-- **Code Analysis**: Detect bugs and potential issues in code
-- **Error Explanation**: Get detailed explanations of errors
-- **Fix Generation**: Receive AI-generated fixes for detected bugs
-- **GitHub Integration**: Create pull requests with fixes
+The core of AgentLogger is its agent-based architecture:
+
+1. **Analyzer Agent**: Examines code for bugs, issues, and potential improvements
+2. **Fix Generator Agent**: Creates fixes for identified issues
+3. **Coordinator Agent**: Orchestrates the workflow between agents
+
+These agents work together through a message-passing system to provide a complete debugging experience.
+
+## Key Features
+
+- **Code Analysis**: Identify bugs, anti-patterns, and performance issues in your code
+- **Error Explanation**: Get multi-level explanations of error messages (simple, detailed, technical)
+- **Automated Fixes**: Generate patches and fixes for common code issues
+- **GitHub Integration**: Analyze PRs and issues directly from GitHub
+- **Sandbox Execution**: Test code in a safe environment to verify issues
 - **Multi-language Support**: Works with Python, JavaScript, and more
-- **Agent-Based Architecture**: Autonomous debugging with specialized agents
 
-## Project Structure
+## Architecture
+
+The system uses a multi-agent architecture where specialized AI agents communicate to solve debugging tasks:
 
 ```
-AgentLogger/
-├── app/                    # Main application package
-│   ├── agents/             # Agent-based architecture components
-│   │   ├── base_agent.py   # Base agent class
-│   │   ├── coordinator_agent.py # Orchestration agent
-│   │   └── analyzer_agent.py # Code analysis agent
-│   ├── api/                # API routes and endpoints
-│   │   └── v1/             # API v1 endpoints
-│   ├── core/               # Core functionality (config, db, middleware)
-│   ├── models/             # Data models
-│   │   ├── db/             # SQLAlchemy database models
-│   │   └── schemas/        # Pydantic schemas for request/response
-│   ├── services/           # Business logic services
-│   │   ├── ai/             # AI services (LLM integration)
-│   │   └── github/         # GitHub integration services
-│   └── utils/              # Utility functions and helpers
-│       ├── parsing/        # Code parsing utilities
-│       └── sandbox/        # Code execution sandbox
-├── tests/                  # Test suite
-├── alembic/                # Database migrations
-├── docs/                   # Documentation
-├── .env.sample             # Sample environment variables
-├── requirements.txt        # Python dependencies
-└── README.md               # Project documentation
+┌─────────────────┐      ┌─────────────────┐
+│                 │      │                 │
+│  Analyzer Agent ├─────►│ Fix Generator   │
+│                 │      │                 │
+└────────┬────────┘      └────────┬────────┘
+         │                        │
+         │                        │
+         ▼                        ▼
+┌─────────────────────────────────────────┐
+│                                         │
+│           Coordinator Agent             │
+│                                         │
+└─────────────────┬───────────────────────┘
+                  │
+                  │
+                  ▼
+┌─────────────────────────────────────────┐
+│                                         │
+│               User Interface            │
+│                                         │
+└─────────────────────────────────────────┘
 ```
 
-## API Endpoints
+## Getting Started
 
-### Code Analysis
+1. Clone the repository
+2. **Set your Groq API key**
+   - Open `docker-compose.yml`
+   - Replace the placeholder in `GROQ_API_KEY=` with your key (`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`)
+   - (Optional) Alternatively, export `GROQ_API_KEY` in your shell before running Docker Compose
+3. Run `docker-compose up -d` to start the application (frontend, backend, and database)
+4. Access the web UI at `http://localhost` (served by nginx)
+5. API documentation is available at `http://localhost/docs` (proxied by nginx)
 
-- `POST /api/v1/analyze`: Submit code for analysis
-- `GET /api/v1/analyze/{analysis_id}`: Get analysis results
-- `POST /api/v1/analyze/{analysis_id}/run`: Run/re-run analysis
+> **Note**: If you prefer to bypass nginx you can reach the backend directly at `http://localhost:8000` but the docs at `/docs` will then require the `X-API-Key` header.
 
-### Code Fixing
+## Configuration
 
-- `POST /api/v1/fix`: Request a fix for a detected issue
-- `GET /api/v1/fix/{fix_id}`: Get fix results
-- `POST /api/v1/fix/{fix_id}/run`: Run/re-run fix generation
+Key environment variables (see `docs/guides/configuration.md` for full list):
 
-### Error Explanation
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GROQ_API_KEY` | Your Groq LLM API key | **Required** |
+| `GROQ_MODEL` | LLM model to use | `llama3-70b-8192` |
+| `DATABASE_URL` | Database connection string | `postgresql://postgres:postgres@db:5432/agentlogger` |
 
-- `POST /api/v1/explain`: Get a simple explanation of an error message
+These can be set in the `docker-compose.yml`, a local `.env` file, or exported in your shell session.
 
-### GitHub Integration
+## API Documentation
 
-- `GET /api/v1/github/pr/{pr_id}/status`: Check PR status
+The API provides endpoints for:
 
-### Agent-Based Debugging
+- `/api/v1/analyze` - Analyze code for issues
+- `/api/v1/explain` - Explain error messages
+- `/api/v1/fix` - Generate fixes for issues
+- `/api/v1/patch` - Create patches for code
 
-- `POST /api/v1/agent/agent-debug`: Start an agent-based debugging session
-- `GET /api/v1/agent/agent-debug/{session_id}`: Get debugging session status
-- `POST /api/v1/agent/start`: Start the agent system
-- `POST /api/v1/agent/stop`: Stop the agent system
-
-### User Management
-
-- `POST /api/v1/users`: Create a new user
-- `GET /api/v1/users/{user_id}`: Get user details
-- `PUT /api/v1/users/{user_id}`: Update user details
-- `DELETE /api/v1/users/{user_id}`: Delete a user
-
-### API Key Management
-
-- `POST /api/v1/api-keys`: Create a new API key
-- `GET /api/v1/api-keys/{api_key_id}`: Get API key details
-- `PUT /api/v1/api-keys/{api_key_id}`: Update API key
-- `DELETE /api/v1/api-keys/{api_key_id}`: Delete an API key
-
-## Running the Application
-
-### Prerequisites
-
-- Python 3.11+
-- PostgreSQL 13+
-- Docker (for sandbox execution, optional)
-- Redis (optional, for caching)
-
-### Quick Start
-
-1. **Clone the repository**
-```bash
-git clone https://github.com/yourusername/agentlogger
-cd agentlogger
+Base URL when running with Docker Compose:
+```
+http://localhost/api/v1
 ```
 
-2. **Create and activate virtual environment**
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+For detailed API documentation, visit `http://localhost/docs` when the application is running.
 
-3. **Install dependencies**
-```bash
-pip install -r requirements.txt
-```
+## Development
 
-4. **Set up environment variables**
-```bash
-cp setup_groq_key.txt .env
-# Edit .env with your Groq API key and other configuration
-```
-
-5. **Set up the database**
-```bash
-# Make sure PostgreSQL is running
-# Create the database
-createdb agentlogger
-
-# Run database migrations
-alembic upgrade head
-
-# Initialize the database
-python scripts/init_db.py
-```
-
-6. **Generate an API key for testing**
-```bash
-python scripts/generate_api_key.py
-# This will output an API key that you can use to access the API
-```
-
-7. **Start the development server**
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-
-8. **Access the API documentation**
-   - Open your browser and go to http://localhost:8000/docs
-   - Use the API key generated in step 6 to authorize (click the "Authorize" button)
-
-### Docker Setup
-
-You can also run the application using Docker:
-
-```bash
-# Build and start the containers
-docker-compose up -d
-
-# Run database migrations
-docker-compose exec app alembic upgrade head
-
-# Initialize the database
-docker-compose exec app python scripts/init_db.py
-
-# Generate an API key
-docker-compose exec app python scripts/generate_api_key.py
-```
-
-### Running Tests
-
-To run the test suite:
-
-```bash
-# Run all tests
-pytest
-
-# Run tests with verbose output
-pytest -v
-
-# Run tests with coverage report
-pip install pytest-cov
-pytest --cov=app
-
-# Run specific test files
-pytest tests/test_health.py
-```
-
-The test suite uses an in-memory SQLite database for testing, so you don't need to set up a separate test database.
-
-For more details on testing, see the [Testing Guide](docs/development/testing.md).
-
-## Testing the Bug Detection and PR Creation
-
-We've included several scripts in the `tests/integration` directory to help you test the bug detection and automatic PR creation functionality:
-
-- `test_buggy_code.py`: A Python file with an intentional bug (division by zero)
-- `test_agent_logger.py`: A script to test the full analysis and fix workflow
-- `test_github_pr.py`: A script to directly test the GitHub PR creation
-- `test_agent_debug.py`: A script to test the agent-based debugging system
-
-To test the system:
-
-```bash
-# For full analysis and fix workflow
-python tests/integration/test_agent_logger.py tests/integration/test_buggy_code.py
-
-# To also create a GitHub PR
-python tests/integration/test_agent_logger.py tests/integration/test_buggy_code.py "yourusername/your-repo"
-
-# To directly test GitHub PR creation
-python tests/integration/test_github_pr.py "yourusername/your-repo"
-
-# To test the agent-based debugging system
-python tests/integration/test_agent_debug.py
-```
-
-See `tests/integration/README.md` for detailed instructions on using these test scripts.
-
-## Usage Example
-
-### Analyze Code for Issues
-
-```python
-import requests
-
-api_key = "your_api_key"  # Use the API key generated earlier
-headers = {"X-API-Key": api_key}
-
-code = """
-def divide(a, b):
-    return a / b
-
-result = divide(10, 0)
-print(f"Result: {result}")
-"""
-
-response = requests.post(
-    "http://localhost:8000/api/v1/analyze",
-    headers=headers,
-    json={"language": "python", "code": code}
-)
-
-analysis_id = response.json()["data"]["id"]
-```
-
-### Get Analysis Results
-
-```python
-response = requests.get(
-    f"http://localhost:8000/api/v1/analyze/{analysis_id}",
-    headers=headers
-)
-
-issues = response.json()["data"]["issues"]
-for issue in issues:
-    print(f"Issue: {issue['message']}")
-```
-
-### Request a Fix
-
-```python
-response = requests.post(
-    "http://localhost:8000/api/v1/fix",
-    headers=headers,
-    json={
-        "analysis_id": analysis_id,
-        "issue_id": issues[0]["id"]
-    }
-)
-
-fix_id = response.json()["data"]["id"]
-```
-
-### Get Fix Results
-
-```python
-response = requests.get(
-    f"http://localhost:8000/api/v1/fix/{fix_id}",
-    headers=headers
-)
-
-fix = response.json()["data"]
-print(f"Fixed code:\n{fix['fixed_code']}")
-print(f"Explanation:\n{fix['explanation']}")
-```
-
-### Use Agent-Based Debugging
-
-```python
-import requests
-import time
-
-api_key = "your_api_key"  # Use the API key generated earlier
-headers = {"X-API-Key": api_key}
-
-# Start the agent system
-requests.post("http://localhost:8000/api/v1/agent/start", headers=headers)
-
-# Submit code for debugging
-code = """
-def divide(a, b):
-    return a / b
-
-result = divide(10, 0)
-print(f"Result: {result}")
-"""
-
-response = requests.post(
-    "http://localhost:8000/api/v1/agent/agent-debug",
-    headers=headers,
-    json={
-        "language": "python", 
-        "code": code,
-        "error_message": "ZeroDivisionError: division by zero"
-    }
-)
-
-session_id = response.json()["session_id"]
-
-# Check status periodically
-while True:
-    response = requests.get(
-        f"http://localhost:8000/api/v1/agent/agent-debug/{session_id}",
-        headers=headers
-    )
-    status = response.json()["status"]
-    print(f"Status: {status}")
-    
-    if status == "completed":
-        print("Debugging completed!")
-        print(response.json())
-        break
-        
-    time.sleep(2)
-```
-
-## Documentation
-
-Comprehensive documentation is available in the `docs` directory:
-
-- **Getting Started**: [docs/guides/getting-started.md](docs/guides/getting-started.md)
-- **Installation Guide**: [docs/guides/installation.md](docs/guides/installation.md)
-- **Configuration Guide**: [docs/guides/configuration.md](docs/guides/configuration.md)
-- **API Reference**: [docs/api/index.md](docs/api/index.md)
-- **Development Guide**: [docs/development/index.md](docs/development/index.md)
-- **Testing Guide**: [docs/development/testing.md](docs/development/testing.md)
-- **Agent Architecture**: [docs/development/agent-architecture.md](docs/development/agent-architecture.md)
-- **Deployment Guide**: [docs/guides/deployment.md](docs/guides/deployment.md)
+See [Development Setup](docs/development/development-setup.md) for instructions on setting up a development environment.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT

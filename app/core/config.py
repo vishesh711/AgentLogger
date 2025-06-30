@@ -27,44 +27,65 @@ class Settings(BaseSettings):
             return v
         raise ValueError(v)
     
+    # Environment
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    
     # Database
-    POSTGRES_SERVER: str
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
+    POSTGRES_SERVER: Optional[str] = os.getenv("POSTGRES_SERVER", "db")
+    POSTGRES_USER: Optional[str] = os.getenv("POSTGRES_USER", "postgres")
+    POSTGRES_PASSWORD: Optional[str] = os.getenv("POSTGRES_PASSWORD", "postgres")
+    POSTGRES_DB: Optional[str] = os.getenv("POSTGRES_DB", "agentlogger")
     SQLALCHEMY_DATABASE_URI: Optional[str] = None
     
     @field_validator("SQLALCHEMY_DATABASE_URI", mode="before")
     def assemble_db_connection(cls, v: Optional[str], info: Dict[str, Any]) -> Any:
         if isinstance(v, str):
             return v
-        
-        # Build the connection string manually
+            
+        # Use SQLite for development if DATABASE_URL is not set
+        if os.getenv("DATABASE_URL"):
+            return os.getenv("DATABASE_URL")
+            
+        # Use SQLite for development by default
+        if info.data.get("ENVIRONMENT") == "development" and not os.getenv("USE_POSTGRES", "").lower() == "true":
+            return "sqlite:///./agentlogger.db"
+            
+        # Build the PostgreSQL connection string
         return f"postgresql://{info.data.get('POSTGRES_USER')}:{info.data.get('POSTGRES_PASSWORD')}@{info.data.get('POSTGRES_SERVER')}/{info.data.get('POSTGRES_DB')}"
     
     # Redis settings (optional)
-    REDIS_HOST: Optional[str] = None
-    REDIS_PORT: Optional[int] = 6379
-    REDIS_PASSWORD: Optional[str] = None
-    USE_REDIS: bool = False
+    REDIS_HOST: Optional[str] = os.getenv("REDIS_HOST", "redis")
+    REDIS_PORT: Optional[int] = int(os.getenv("REDIS_PORT", "6379"))
+    REDIS_PASSWORD: Optional[str] = os.getenv("REDIS_PASSWORD", "")
+    USE_REDIS: bool = os.getenv("USE_REDIS", "false").lower() == "true"
     
     # Security settings
-    SECRET_KEY: str
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "supersecretkey")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
     # LLM settings
-    GROQ_API_KEY: str
-    GROQ_MODEL: str = "llama3-70b-8192"
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama3-70b-8192")
     
     # GitHub integration
-    GITHUB_ACCESS_TOKEN: Optional[str] = None
+    GITHUB_ACCESS_TOKEN: Optional[str] = os.getenv("GITHUB_ACCESS_TOKEN", "")
     
     # Sandbox execution
-    USE_DOCKER_SANDBOX: bool = True
-    EXECUTION_TIMEOUT: int = 30  # seconds
+    USE_DOCKER_SANDBOX: bool = os.getenv("USE_DOCKER_SANDBOX", "true").lower() == "true"
+    EXECUTION_TIMEOUT: int = int(os.getenv("EXECUTION_TIMEOUT", "30"))  # seconds
     
     # Rate limiting
-    RATE_LIMIT_PER_MINUTE: int = 60
+    RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
+    
+    # Sentry settings
+    SENTRY_DSN: Optional[str] = os.getenv("SENTRY_DSN", "")
+    SENTRY_ENVIRONMENT: str = os.getenv("SENTRY_ENVIRONMENT", "development")
+    SENTRY_TRACES_SAMPLE_RATE: float = float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1"))
+    
+    # Analytics settings
+    ENABLE_ANALYTICS: bool = os.getenv("ENABLE_ANALYTICS", "false").lower() == "true"
+    ANALYTICS_PROVIDER: Optional[str] = os.getenv("ANALYTICS_PROVIDER", "")
+    ANALYTICS_API_KEY: Optional[str] = os.getenv("ANALYTICS_API_KEY", "")
 
 
 settings = Settings() 

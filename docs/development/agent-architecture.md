@@ -1,225 +1,255 @@
-# Agent-Based Architecture for AgentLogger
+# Agent Architecture
 
-This document outlines a design for evolving AgentLogger into a true multi-agent system for autonomous code debugging and fixing.
+AgentLogger uses an agent-based architecture to provide intelligent debugging capabilities. This document explains the architecture and how the different agents work together.
 
 ## Overview
 
-The current AgentLogger system uses AI to analyze code, explain errors, and generate fixes, but operates in a relatively linear fashion with limited autonomous capabilities. This design proposes transforming AgentLogger into a system of specialized, cooperative agents that can reason, plan, and execute complex debugging workflows autonomously.
+The agent system consists of specialized AI agents that work together to analyze code, identify issues, and generate fixes. Each agent has a specific role and expertise, allowing them to collaborate effectively.
 
-## Core Agent Types
+```
+┌─────────────────────┐
+│                     │
+│  Coordinator Agent  │
+│                     │
+└─────────┬───────────┘
+          │
+          │ coordinates
+          │
+┌─────────▼───────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│                     │     │                     │     │                     │
+│   Analyzer Agent    │────▶│ Fix Generator Agent │────▶│   GitHub Agent      │
+│                     │     │                     │     │                     │
+└─────────────────────┘     └─────────────────────┘     └─────────────────────┘
+```
 
-### 1. Coordinator Agent
+## Agent Types
 
-The Coordinator Agent serves as the orchestrator of the entire debugging process.
+### Coordinator Agent
 
-**Responsibilities:**
-- Interpret user requests and determine the appropriate workflow
-- Coordinate the activities of specialized agents
-- Maintain the overall state of the debugging process
-- Make high-level decisions about strategy
-- Report progress and results back to the user
+The Coordinator Agent is responsible for orchestrating the debugging process. It:
 
-**Implementation:**
-- Uses a planning system to create and adjust workflows
-- Maintains a memory of the current debugging session
-- Has access to all specialized agents as tools
+- Receives the initial debugging request
+- Determines which agents to invoke and in what order
+- Manages the flow of information between agents
+- Aggregates results and provides the final response
 
-### 2. Analyzer Agent
-
-The Analyzer Agent focuses on understanding code and identifying issues.
-
-**Responsibilities:**
-- Parse and analyze code structure
-- Identify potential bugs, vulnerabilities, and code smells
-- Classify issues by type, severity, and confidence
-- Provide detailed context for each identified issue
-
-**Implementation:**
-- Combines static analysis tools with LLM-based reasoning
-- Uses a specialized prompt template focused on code analysis
-- Can execute targeted code segments in sandbox environments
-- Maintains a knowledge base of common bug patterns
-
-### 3. Explainer Agent
-
-The Explainer Agent specializes in interpreting error messages and explaining issues in human terms.
-
-**Responsibilities:**
-- Translate technical error messages into clear explanations
-- Provide context about why an issue occurs
-- Explain potential implications of the issue
-- Suggest general approaches for fixing
-
-**Implementation:**
-- Uses templates for common error types
-- Has access to documentation and best practices
-- Can generate visualizations to explain complex issues
-
-### 4. Fix Generator Agent
-
-The Fix Generator Agent creates solutions for identified issues.
-
-**Responsibilities:**
-- Design potential fixes for identified issues
-- Generate code patches
-- Evaluate multiple solution approaches
-- Consider edge cases and potential side effects
-
-**Implementation:**
-- Uses a specialized code generation model
-- Maintains a library of common fix patterns
-- Can generate multiple alternative solutions
-- Reasons about code context beyond the immediate issue
-
-### 5. Test Agent
-
-The Test Agent validates proposed fixes.
-
-**Responsibilities:**
-- Create test cases for the issue and fix
-- Execute tests in sandbox environments
-- Verify that fixes resolve the original issue
-- Check for regressions or new issues introduced by fixes
-
-**Implementation:**
-- Can generate unit tests automatically
-- Uses sandbox execution for safety
-- Tracks test results and coverage
-- Can perform fuzzing and edge case testing
-
-### 6. PR Agent
-
-The PR Agent handles GitHub integration and pull request management.
-
-**Responsibilities:**
-- Create branches and commits
-- Format and submit pull requests
-- Respond to feedback on PRs
-- Update PRs based on review comments
-
-**Implementation:**
-- Integrates with GitHub API
-- Formats commit messages and PR descriptions
-- Can interpret and respond to review comments
-- Follows project-specific PR templates and conventions
-
-## Agent Communication and Workflow
-
-Agents communicate through a structured message passing system:
-
-1. **Message Format**: JSON objects with fields for:
-   - Message type (request, response, notification)
-   - Sender and recipient agent IDs
-   - Content (structured data relevant to the message)
-   - Metadata (timestamps, message IDs, etc.)
-
-2. **Workflow Example**:
-   ```
-   User Request → Coordinator Agent
-                  ↓
-   Coordinator creates plan and delegates
-                  ↓
-   Analyzer Agent ← → Explainer Agent
-                  ↓
-   Fix Generator Agent
-                  ↓
-   Test Agent
-                  ↓
-   PR Agent
-                  ↓
-   Coordinator Agent → User Response
-   ```
-
-3. **State Management**: Each debugging session maintains a state object that tracks:
-   - Original code and context
-   - Identified issues
-   - Generated explanations
-   - Proposed fixes
-   - Test results
-   - PR status
-
-## Agent Implementation
-
-Each agent will be implemented as a class with:
-
-1. **Core Logic**: Python functions implementing the agent's specific capabilities
-2. **LLM Integration**: Prompt templates and response parsers
-3. **Tool Access**: Methods to call external tools and APIs
-4. **Memory**: State tracking for the agent's specific domain
-5. **Communication Interface**: Methods to send and receive messages
-
-Example agent class structure:
+**Implementation**: `app/agents/coordinator_agent.py`
 
 ```python
-class AnalyzerAgent:
-    def __init__(self, llm_client, tools):
-        self.llm_client = llm_client
-        self.tools = tools
-        self.memory = {}
+class CoordinatorAgent(BaseAgent):
+    """
+    Agent responsible for coordinating the debugging process.
+    """
+    
+    async def process(self, session_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process the debugging session by coordinating other agents.
+        """
+        # Determine which agents to invoke based on the task
+        if "code" in session_data:
+            # First analyze the code
+            analyzer_agent = AnalyzerAgent()
+            analysis_result = await analyzer_agent.process(session_data)
+            
+            # If issues were found and fix is requested, generate fixes
+            if analysis_result.get("issues") and session_data.get("generate_fix", True):
+                fix_agent = FixGeneratorAgent()
+                fix_result = await fix_agent.process({
+                    **session_data,
+                    "analysis_result": analysis_result
+                })
+                
+                return {
+                    "analysis": analysis_result,
+                    "fixes": fix_result.get("fixes", [])
+                }
+            
+            return {"analysis": analysis_result}
+            
+        elif "error_trace" in session_data:
+            # Handle error explanation
+            # ...
+```
+
+### Analyzer Agent
+
+The Analyzer Agent is responsible for analyzing code and identifying issues. It:
+
+- Parses the code to understand its structure
+- Identifies syntax errors, logical bugs, and other issues
+- Categorizes issues by type and severity
+- Provides detailed information about each issue
+
+**Implementation**: `app/agents/analyzer_agent.py`
+
+```python
+class AnalyzerAgent(BaseAgent):
+    """
+    Agent responsible for analyzing code and identifying issues.
+    """
+    
+    async def process(self, session_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Analyze code and identify issues.
+        """
+        code = session_data.get("code")
+        language = session_data.get("language")
         
-    async def process_message(self, message):
-        # Process incoming message
-        # ...
+        if not code or not language:
+            return {"error": "Code and language are required"}
         
-    async def analyze_code(self, code, language):
-        # Analyze code for issues
-        # ...
+        # Get the appropriate parser for the language
+        parser = parser_factory.get_parser(language)
         
-    async def classify_issue(self, issue):
-        # Classify the type and severity of an issue
+        # Parse the code
+        parsed_code = parser.parse(code)
+        
+        # Use AI to analyze the code
+        groq_client = GroqClient()
+        issues = await groq_client.analyze_code(code, language)
+        
+        return {
+            "issues": issues,
+            "language": language,
+            "parsed_structure": parsed_code
+        }
+```
+
+### Fix Generator Agent
+
+The Fix Generator Agent is responsible for generating fixes for identified issues. It:
+
+- Takes the analysis results from the Analyzer Agent
+- Generates potential fixes for each issue
+- Validates the fixes to ensure they resolve the issues
+- Provides explanations for the fixes
+
+**Implementation**: `app/agents/fix_generator_agent.py`
+
+```python
+class FixGeneratorAgent(BaseAgent):
+    """
+    Agent responsible for generating fixes for identified issues.
+    """
+    
+    async def process(self, session_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Generate fixes for identified issues.
+        """
+        code = session_data.get("code")
+        language = session_data.get("language")
+        analysis_result = session_data.get("analysis_result", {})
+        issues = analysis_result.get("issues", [])
+        
+        if not issues:
+            return {"message": "No issues to fix"}
+        
+        fixes = []
+        groq_client = GroqClient()
+        
+        for issue in issues:
+            # Generate a fix for the issue
+            fix_result = await groq_client.fix_issue(code, language, issue)
+            
+            # Validate the fix
+            is_valid = self._validate_fix(code, fix_result.get("fixed_code", ""), issue)
+            
+            fixes.append({
+                "issue_id": issue.get("id"),
+                "fixed_code": fix_result.get("fixed_code", ""),
+                "explanation": fix_result.get("explanation", ""),
+                "is_valid": is_valid
+            })
+        
+        return {"fixes": fixes}
+    
+    def _validate_fix(self, original_code: str, fixed_code: str, issue: Dict[str, Any]) -> bool:
+        """
+        Validate that the fix resolves the issue.
+        """
+        # Implement validation logic
         # ...
 ```
 
-## System Architecture
+## Agent Communication
 
-The overall system architecture consists of:
+Agents communicate with each other through structured data passed between their `process` methods. The Coordinator Agent manages this flow of information, ensuring that each agent receives the data it needs and that the results are properly aggregated.
 
-1. **Agent Layer**: The specialized agents described above
-2. **Orchestration Layer**: Manages agent communication and workflow execution
-3. **Tool Layer**: External tools and APIs that agents can use
-4. **Storage Layer**: Databases for persistent storage of debugging sessions
-5. **API Layer**: REST API for user interaction
+## Agent System Workflow
 
-## Implementation Plan
+1. **Initialization**: The Coordinator Agent is initialized with the user's request.
+2. **Task Determination**: The Coordinator Agent determines the task type (code analysis, error explanation, etc.).
+3. **Agent Selection**: The Coordinator Agent selects the appropriate agents to handle the task.
+4. **Processing**: Each agent processes its part of the task and returns results.
+5. **Aggregation**: The Coordinator Agent aggregates the results from all agents.
+6. **Response**: The final response is returned to the user.
 
-### Phase 1: Agent Framework
-- Implement the base agent class and communication system
-- Create the Coordinator Agent with basic planning capabilities
-- Develop the agent state management system
+## Integration with Services
 
-### Phase 2: Specialized Agents
-- Implement the Analyzer Agent
-- Implement the Explainer Agent
-- Implement the Fix Generator Agent
+The agents use various services to perform their tasks:
 
-### Phase 3: Testing and Integration
-- Implement the Test Agent
-- Implement the PR Agent
-- Integrate all agents into a cohesive system
+- **AI Services**: For code analysis, fix generation, and error explanation
+- **Parser Services**: For parsing and understanding code
+- **Sandbox Services**: For safely executing code to validate fixes
+- **GitHub Services**: For creating pull requests with fixes
 
-### Phase 4: Advanced Capabilities
-- Add learning capabilities to improve agent performance over time
-- Implement collaborative debugging with multiple agents
-- Add support for more languages and frameworks
+## Error Handling
 
-## Evaluation Metrics
+The agent system includes robust error handling to ensure that failures in one agent don't crash the entire system:
 
-The agent system will be evaluated on:
+- Each agent catches and handles its own exceptions
+- The Coordinator Agent monitors agent execution and handles failures
+- If an agent fails, the Coordinator Agent can try alternative approaches or provide partial results
 
-1. **Autonomy**: Ability to solve issues with minimal human intervention
-2. **Success Rate**: Percentage of bugs successfully fixed
-3. **Solution Quality**: Quality of generated fixes (correctness, efficiency, readability)
-4. **Explanation Quality**: Clarity and accuracy of explanations
-5. **Time Efficiency**: Time to generate and validate fixes
+## Extending the Agent System
 
-## Technical Requirements
+To add a new agent type:
 
-- **LLM Integration**: Advanced integration with models like GPT-4, Claude, or Llama 3
-- **Tool Use**: Framework for agents to use external tools
-- **Sandboxing**: Secure execution environment for testing code
-- **State Management**: Efficient tracking of debugging session state
-- **Scalability**: Ability to handle multiple concurrent debugging sessions
+1. Create a new agent class that extends `BaseAgent`
+2. Implement the `process` method
+3. Update the Coordinator Agent to use the new agent when appropriate
+
+Example:
+
+```python
+class NewAgent(BaseAgent):
+    """
+    A new agent type.
+    """
+    
+    async def process(self, session_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process the session data.
+        """
+        # Implement agent logic
+        # ...
+        
+        return {"result": "..."}
+```
+
+## Agent Configuration
+
+Agents can be configured through the application configuration:
+
+```python
+# app/core/config.py
+class Settings(BaseSettings):
+    # ...
+    
+    # Agent settings
+    AGENT_TIMEOUT: int = 30  # seconds
+    AGENT_MAX_RETRIES: int = 3
+    AGENT_PARALLEL_EXECUTION: bool = True
+```
+
+## Monitoring and Debugging
+
+The agent system includes monitoring and debugging capabilities:
+
+- Each agent logs its actions and results
+- The Coordinator Agent tracks the execution time of each agent
+- Detailed logs can be enabled for debugging purposes
 
 ## Conclusion
 
-This agent-based architecture transforms AgentLogger from an AI-assisted tool into a truly autonomous debugging system. By decomposing the debugging process into specialized agents, the system can handle more complex bugs, provide better explanations, and generate higher-quality fixes while maintaining a coherent workflow. 
+The agent-based architecture provides AgentLogger with powerful, flexible debugging capabilities. By breaking down the debugging process into specialized tasks handled by different agents, the system can provide more accurate and helpful results than a monolithic approach. 

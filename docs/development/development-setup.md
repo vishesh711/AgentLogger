@@ -1,137 +1,110 @@
 # Development Setup
 
-This guide will help you set up your development environment for working on the AgentLogger project.
+This guide will help you set up the AgentLogger project for development.
 
 ## Prerequisites
 
-- Python 3.11 or later
-- PostgreSQL 13 or later
-- Docker (for sandbox execution)
+- Python 3.11+
+- PostgreSQL 13+ (optional, SQLite can be used for development)
+- Docker (optional, for sandbox execution and containerized deployment)
 - Git
 
-## Step 1: Clone the Repository
+## Setting Up the Development Environment
+
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/yourusername/agentlogger.git
 cd agentlogger
 ```
 
-## Step 2: Create a Virtual Environment
+### 2. Create and Activate a Virtual Environment
 
 ```bash
+# Create a virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Activate the virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
 ```
 
-## Step 3: Install Development Dependencies
+### 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
-pip install pytest pytest-cov black flake8 mypy
+
+# Install development dependencies
+pip install -e ".[dev]"
 ```
 
-## Step 4: Set Up Environment Variables
-
-Create a `.env` file in the project root:
+### 4. Set Up Environment Variables
 
 ```bash
-cp setup_groq_key.txt .env
+# Copy the sample environment file
+cp .env.sample .env
+
+# Edit the .env file with your settings
+# Particularly, you'll need to set:
+# - GROQ_API_KEY: Your Groq API key for AI functionality
+# - DATABASE_URL: Your database connection string (SQLite is fine for development)
 ```
 
-Edit the `.env` file to include your development configuration:
-
-```
-# Project settings
-PROJECT_NAME=AgentLogger API (Dev)
-PROJECT_DESCRIPTION=AI-powered debugging API service
-VERSION=0.1.0
-
-# API settings
-API_V1_STR=/api/v1
-
-# CORS settings
-CORS_ORIGINS=http://localhost:3000,http://localhost:8000
-
-# Database settings
-POSTGRES_SERVER=localhost
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=agentlogger_dev
-
-# Redis settings (optional)
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-USE_REDIS=false
-
-# Security settings
-SECRET_KEY=dev-secret-key-change-in-production
-
-# LLM settings
-GROQ_API_KEY=your-groq-api-key
-GROQ_MODEL=llama3-70b-8192
-
-# GitHub integration (optional)
-GITHUB_ACCESS_TOKEN=your-github-token
-
-# Sandbox execution
-USE_DOCKER_SANDBOX=true
-EXECUTION_TIMEOUT=30
-
-# Rate limiting
-RATE_LIMIT_PER_MINUTE=60
-```
-
-## Step 5: Set Up the Database
-
-Make sure PostgreSQL is running, then create the development database:
+### 5. Set Up the Database
 
 ```bash
-createdb agentlogger_dev
-```
-
-Run the database migrations:
-
-```bash
+# Run database migrations
 alembic upgrade head
-```
 
-Initialize the database with test data:
-
-```bash
+# Seed the database with initial data (optional)
 python scripts/init_db.py
 ```
 
-## Step 6: Generate an API Key for Development
+### 6. Generate an API Key for Testing
 
 ```bash
 python scripts/generate_api_key.py
+# This will output an API key that you can use for testing
 ```
 
-This will create an admin user and API key that you can use for development.
-
-## Step 7: Start the Development Server
+### 7. Run the Development Server
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload
 ```
 
-The API should now be accessible at http://localhost:8000. You can access the API documentation at http://localhost:8000/docs.
+The API will be available at http://localhost:8000.
+
+The API documentation will be available at:
+- Swagger UI: http://localhost:8000/v1/docs
+- ReDoc: http://localhost:8000/v1/redoc
 
 ## Development Workflow
 
-### Code Style
+### Code Style and Linting
 
-We use Black for code formatting, Flake8 for linting, and MyPy for type checking:
+We use the following tools for code quality:
+
+- Black for code formatting
+- isort for import sorting
+- Flake8 for linting
+- mypy for type checking
+
+Run these tools before committing:
 
 ```bash
 # Format code
 black app tests
 
+# Sort imports
+isort app tests
+
 # Lint code
 flake8 app tests
 
-# Type check code
+# Type check
 mypy app
 ```
 
@@ -142,85 +115,69 @@ mypy app
 pytest
 
 # Run tests with coverage
-pytest --cov=app tests/
+pytest --cov=app
 
-# Run a specific test file
+# Run specific test files
 pytest tests/test_health.py
 ```
 
-### Database Migrations
+### Working with the CLI Tool
 
-If you make changes to the database models, you need to create a new migration:
+To develop and test the CLI tool:
 
 ```bash
-# Create a new migration
-alembic revision --autogenerate -m "description of changes"
+# Install the CLI in development mode
+pip install -e cli/
 
-# Apply the migration
-alembic upgrade head
-
-# Downgrade to a specific revision
-alembic downgrade revision_id
+# Run the CLI
+agent-logger --help
 ```
 
-### Working with Docker
+### Docker Development
 
-For development with Docker:
+You can also use Docker for development:
 
 ```bash
-# Build the Docker image
-docker-compose build
-
-# Start the services
+# Build and start the containers
 docker-compose up -d
 
-# View logs
-docker-compose logs -f
+# Run commands inside the container
+docker-compose exec api python scripts/generate_api_key.py
 
-# Stop the services
+# Stop the containers
 docker-compose down
 ```
 
 ## Debugging
 
-### FastAPI Debug Mode
+### Sentry Integration
 
-FastAPI's debug mode is enabled by default when using `--reload` with Uvicorn.
+For local development, you can set up Sentry by:
 
-### Database Debugging
+1. Creating a free Sentry account
+2. Creating a new project in Sentry
+3. Adding your DSN to the `.env` file:
 
-You can connect to the PostgreSQL database using psql:
-
-```bash
-psql -U postgres -d agentlogger_dev
+```
+SENTRY_DSN=your-sentry-dsn
+SENTRY_ENVIRONMENT=development
 ```
 
-### API Debugging
+### Monitoring API Calls
 
-You can use the Swagger UI at http://localhost:8000/docs to test API endpoints.
+The API includes middleware for monitoring API calls. You can enable it by setting:
 
-## Troubleshooting
+```
+ENABLE_ANALYTICS=true
+ANALYTICS_PROVIDER=segment|mixpanel|posthog
+ANALYTICS_API_KEY=your-analytics-api-key
+```
 
-### Database Connection Issues
+## Next Steps
 
-If you encounter database connection issues:
+Once you have your development environment set up, check out:
 
-1. Make sure PostgreSQL is running
-2. Verify the database connection details in your `.env` file
-3. Check that the database exists and the user has appropriate permissions
-
-### API Key Authentication Issues
-
-If you encounter API key authentication issues:
-
-1. Make sure you've generated an API key using `scripts/generate_api_key.py`
-2. Make sure you're including the API key in the `X-API-Key` header
-3. Check that the API key is valid in the database
-
-### Docker Issues
-
-If you encounter Docker issues:
-
-1. Make sure Docker is running
-2. Try rebuilding the Docker image: `docker-compose build --no-cache`
-3. Check Docker logs: `docker-compose logs -f` 
+- [Project Structure](project-structure.md) for an overview of the codebase
+- [Agent Architecture](agent-architecture.md) to understand the agent system
+- [Testing Guide](testing.md) for more details on testing
+- [Database Migrations](database-migrations.md) for working with database changes 

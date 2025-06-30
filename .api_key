@@ -1,0 +1,11 @@
+
+API Key generated successfully!
+============================================================
+API Key: vOs3bdw_6JZ9Sp1uijp-Dv4vp7U73aaROpB7vzeT0w4
+User ID: b4b947d0-7061-437b-9d95-6d6a4733c6f3
+Expires: 2026-06-30 03:42:32.323004
+============================================================
+
+Use this key in your requests with the X-API-Key header:
+curl -H 'X-API-Key: vOs3bdw_6JZ9Sp1uijp-Dv4vp7U73aaROpB7vzeT0w4' http://localhost:8000/api/v1/health
+============================================================

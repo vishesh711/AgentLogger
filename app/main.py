@@ -5,9 +5,10 @@ import time
 import os
 import logging
 from fastapi.openapi.utils import get_openapi
+import sentry_sdk
 
 from app.core.config import settings
-from app.core.middleware import add_middleware
+from app.core.middleware import add_middlewares
 from app.api.v1.router import api_router
 
 # Configure logging
@@ -17,11 +18,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger("agentlogger")
 
+# Initialize Sentry if DSN is provided
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.SENTRY_ENVIRONMENT,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        
+        # Set a name for this service
+        service_name=settings.PROJECT_NAME,
+        
+        # Enable performance monitoring
+        enable_tracing=True,
+    )
+    logger.info("Sentry integration enabled")
+
 # Initialize FastAPI app
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description=settings.PROJECT_DESCRIPTION,
-    version=settings.VERSION,
+    description="AI-powered debugging service",
+    version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
@@ -38,7 +54,7 @@ if settings.CORS_ORIGINS:
     )
 
 # Add custom middleware
-add_middleware(app)
+add_middlewares(app)
 
 # Add request timing middleware
 @app.middleware("http")
@@ -56,19 +72,22 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 # Root endpoint
 @app.get("/")
 async def root():
-    return {
-        "message": "Welcome to AgentLogger API",
-        "docs": "/docs",
-        "health": "/v1/health",
-    }
+    return {"status": "ok", "message": "Welcome to AgentLogger API"}
 
 # Exception handlers
 @app.exception_handler(Exception)
-async def generic_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+async def global_exception_handler(request: Request, exc: Exception):
+    # Log the exception
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    
+    # Capture exception in Sentry if enabled
+    if settings.SENTRY_DSN:
+        sentry_sdk.capture_exception(exc)
+    
+    # Return a generic error response
     return JSONResponse(
         status_code=500,
-        content={"detail": "An unexpected error occurred. Please try again later."},
+        content={"detail": "An internal server error occurred"},
     )
 
 # Custom OpenAPI schema
@@ -78,8 +97,8 @@ def custom_openapi():
     
     openapi_schema = get_openapi(
         title=settings.PROJECT_NAME,
-        version=settings.VERSION,
-        description=settings.PROJECT_DESCRIPTION,
+        version="0.1.0",
+        description="AI-powered debugging service",
         routes=app.routes,
     )
     
@@ -88,9 +107,12 @@ def custom_openapi():
         "ApiKeyAuth": {
             "type": "apiKey",
             "in": "header",
-            "name": "X-API-Key",
+            "name": "X-API-Key"
         }
     }
+    
+    # Apply security to all routes
+    openapi_schema["security"] = [{"ApiKeyAuth": []}]
     
     app.openapi_schema = openapi_schema
     return app.openapi_schema
