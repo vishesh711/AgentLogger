@@ -1,115 +1,154 @@
 version: '3.8'
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-    container_name: agentlogger-api-prod
-    command: gunicorn app.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
-    volumes:
-      - ./app:/app/app
-      - ./logs:/app/logs
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
-      - redis
-    environment:
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db/agentlogger
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - USE_REDIS=true
-      - USE_DOCKER_SANDBOX=true
-      - ENVIRONMENT=production
-    networks:
-      - agentlogger-network
-    restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.prod
-    container_name: agentlogger-frontend-prod
+      dockerfile: Dockerfile
     ports:
       - "80:80"
-      - "443:443"
+      - "443:443"  # HTTPS support
     depends_on:
-      - app
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
+      - backend
     networks:
       - agentlogger-network
-    restart: always
-
-  db:
-    image: postgres:15
-    container_name: agentlogger-db-prod
-    volumes:
-      - postgres_data_prod:/var/lib/postgresql/data/
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=agentlogger
+      - VITE_API_URL=${API_URL:-https://api.agentlogger.com/api/v1}
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    environment:
+      # Database
+      - DATABASE_URL=${DATABASE_URL}
+      - POSTGRES_SERVER=${POSTGRES_SERVER:-db}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-agentlogger}
+      
+      # Security
+      - SECRET_KEY=${SECRET_KEY}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
+      
+      # AI/LLM
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL=${GROQ_MODEL:-llama3-70b-8192}
+      
+      # OAuth
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - GITHUB_REDIRECT_URI=${GITHUB_REDIRECT_URI}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      
+      # Application
+      - ENVIRONMENT=production
+      - USE_DOCKER_SANDBOX=true
+      - USE_REDIS=${USE_REDIS:-true}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      
+      # CORS
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://agentlogger.com,https://www.agentlogger.com}
+      
+      # Monitoring
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_ENVIRONMENT=production
+      
+      # Performance
+      - WORKERS=${WORKERS:-4}
     ports:
-      - "5432:5432"
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - agentlogger-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: always
+    restart: unless-stopped
     deploy:
       resources:
         limits:
-          cpus: '1'
           memory: 1G
+        reservations:
+          memory: 512M
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-agentlogger}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/backup.sh:/backup.sh
+    networks:
+      - agentlogger-network
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
 
   redis:
     image: redis:7-alpine
-    container_name: agentlogger-redis-prod
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis}
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
     volumes:
       - redis_data:/data
     networks:
       - agentlogger-network
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 5s
+      timeout: 3s
       retries: 5
-    restart: always
+    restart: unless-stopped
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 500M
+          memory: 256M
+        reservations:
+          memory: 128M
 
-  certbot:
-    image: certbot/certbot
-    container_name: agentlogger-certbot
+  # Optional: Nginx reverse proxy for production
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+      - ./nginx/prod:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl  # SSL certificates
     depends_on:
       - frontend
+      - backend
+    networks:
+      - agentlogger-network
+    restart: unless-stopped
 
 networks:
   agentlogger-network:
     driver: bridge
 
 volumes:
-  postgres_data_prod:
-  redis_data: 
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local 

@@ -27,11 +27,10 @@ async def github_authorize():
     auth_url = f"https://github.com/login/oauth/authorize?{urlencode(params)}"
     return {"auth_url": auth_url}
 
-@router.post("/callback")
+@router.get("/callback")
 async def github_callback(
     code: str,
-    state: str,
-    user_id: str = Depends(verify_token),
+    state: str = None,
     db: Session = Depends(get_db)
 ):
     """Handle GitHub OAuth callback"""
@@ -67,22 +66,61 @@ async def github_callback(
         user_response.raise_for_status()
         github_user = user_response.json()
     
-    # Update user with GitHub information
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+    # Get user email from GitHub
+    async with httpx.AsyncClient() as client:
+        email_response = await client.get(
+            "https://api.github.com/user/emails",
+            headers={"Authorization": f"token {access_token}"}
         )
+        email_response.raise_for_status()
+        emails = email_response.json()
+        primary_email = next((email['email'] for email in emails if email['primary']), None)
     
-    user.github_username = github_user.get("login")
-    user.github_access_token = access_token
+    # Find or create user
+    user = db.query(User).filter(User.github_username == github_user.get("login")).first()
+    if not user and primary_email:
+        user = db.query(User).filter(User.email == primary_email).first()
+    
+    if not user:
+        # Create new user
+        from uuid import uuid4
+        user = User(
+            id=str(uuid4()),
+            email=primary_email or f"{github_user.get('login')}@github.local",
+            full_name=github_user.get("name") or github_user.get("login"),
+            github_username=github_user.get("login"),
+            github_access_token=access_token,
+            is_active=True
+        )
+        db.add(user)
+    else:
+        # Update existing user
+        user.github_username = github_user.get("login")
+        user.github_access_token = access_token
+        if not user.full_name and github_user.get("name"):
+            user.full_name = github_user.get("name")
+    
     db.commit()
+    db.refresh(user)
+    
+    # Create access token for the user
+    from app.api.v1.endpoints.auth import create_access_token
+    from datetime import timedelta
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    jwt_token = create_access_token(
+        data={"sub": str(user.id)}, expires_delta=access_token_expires
+    )
     
     return {
-        "message": "GitHub account connected successfully",
-        "github_username": github_user.get("login"),
-        "github_user_id": github_user.get("id")
+        "message": "GitHub authentication successful",
+        "access_token": jwt_token,
+        "token_type": "bearer",
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "full_name": user.full_name,
+            "github_username": user.github_username
+        }
     }
 
 @router.get("/repositories")

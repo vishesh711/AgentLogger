@@ -7,7 +7,7 @@ from app.core.config import settings
 
 router = APIRouter()
 
-@router.get("/health")
+@router.get("/")
 async def health_check(db: Session = Depends(get_db)):
     """
     Health check endpoint to verify API is running
@@ -16,5 +16,5 @@ async def health_check(db: Session = Depends(get_db)):
         "status": "ok",
         "timestamp": datetime.utcnow().isoformat(),
         "version": settings.VERSION,
-        "environment": "development"
+        "environment": settings.ENVIRONMENT
     } 

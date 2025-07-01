@@ -6,6 +6,7 @@ from fastapi import HTTPException, Request, Response, FastAPI, status, Depends
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_429_TOO_MANY_REQUESTS
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+import jwt
 
 from app.core.config import settings
 from app.core.db import get_db, SessionLocal
@@ -89,7 +90,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     """
-    Middleware for API key authentication
+    Middleware for API key and JWT token authentication
     """
     def __init__(self, app: FastAPI):
         super().__init__(app)
@@ -102,7 +103,10 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             "/api/v1/openapi.json",
             "/api/v1/health",
             "/api/v1/health/health",
-            "/api/v1/users",
+            "/api/v1/auth/register",
+            "/api/v1/auth/login",
+            "/api/v1/auth/github",
+            "/api/v1/auth/google",
             "/",
             "/favicon.ico",
         ]
@@ -111,15 +115,29 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         # Skip authentication for public paths
         request_path = request.url.path
         for path in self.public_paths:
-            if request_path == path or request_path.startswith(path):
+            # Exact match or prefix match (but not for root "/" to avoid matching everything)
+            if request_path == path or (path != "/" and request_path.startswith(path)):
                 return await call_next(request)
         
-        # Get API key from header
+        # Try JWT token first
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            try:
+                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+                user_id = payload.get("sub")
+                if user_id:
+                    request.state.user_id = user_id
+                    return await call_next(request)
+            except jwt.PyJWTError as e:
+                pass  # Fall back to API key authentication
+        
+        # Fall back to API key authentication
         api_key = request.headers.get("X-API-Key")
         if not api_key:
             return JSONResponse(
                 status_code=401,
-                content={"detail": "API key required"},
+                content={"detail": "Authentication required. Provide either a valid API key or JWT token."},
             )
         
         # Create database session for validation

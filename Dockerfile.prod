@@ -5,10 +5,11 @@ WORKDIR /app
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libpq-dev \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Copy requirements and build wheels
 COPY requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
 
@@ -25,17 +26,72 @@ RUN addgroup --system app && \
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    libpq5 \
+    netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy wheels from builder stage
+# Copy wheels from builder stage and install
 COPY --from=builder /app/wheels /wheels
-RUN pip install --no-cache /wheels/*
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir /wheels/* && \
+    pip install --no-cache-dir gunicorn && \
+    rm -rf /wheels
 
 # Copy application code
 COPY . .
 
+# Create entrypoint script for production
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+echo "Production startup script starting..."\n\
+\n\
+# Wait for database\n\
+echo "Waiting for database connection..."\n\
+while ! nc -z ${POSTGRES_SERVER:-db} ${POSTGRES_PORT:-5432}; do\n\
+  echo "Database not ready, waiting..."\n\
+  sleep 2\n\
+done\n\
+echo "✅ Database connection established!"\n\
+\n\
+# Run migrations\n\
+echo "Running database migrations..."\n\
+alembic upgrade head || {\n\
+  echo "❌ Migration failed, exiting..."\n\
+  exit 1\n\
+}\n\
+echo "✅ Database migrations completed!"\n\
+\n\
+# Initialize database with default data\n\
+echo "Initializing database..."\n\
+python scripts/init_db.py || {\n\
+  echo "Database initialization failed, but continuing..."\n\
+}\n\
+\n\
+echo "🚀 Starting application with Gunicorn..."\n\
+exec gunicorn app.main:app \\\n\
+    --workers ${WORKERS:-4} \\\n\
+    --worker-class uvicorn.workers.UvicornWorker \\\n\
+    --bind 0.0.0.0:${PORT:-8000} \\\n\
+    --access-logfile - \\\n\
+    --error-logfile - \\\n\
+    --log-level info \\\n\
+    --timeout 30 \\\n\
+    --keepalive 2 \\\n\
+    --max-requests 1000 \\\n\
+    --max-requests-jitter 50\n\
+' > /app/entrypoint-prod.sh && chmod +x /app/entrypoint-prod.sh
+
 # Set proper permissions
 RUN chown -R app:app /app
+
+# Add health check
+RUN echo '#!/bin/bash\ncurl -f http://localhost:${PORT:-8000}/api/v1/health || exit 1' > /app/healthcheck-prod.sh && \
+    chmod +x /app/healthcheck-prod.sh && \
+    chown app:app /app/healthcheck-prod.sh
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD ["/app/healthcheck-prod.sh"]
 
 # Switch to non-root user
 USER app
@@ -43,13 +99,12 @@ USER app
 # Set environment variables
 ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
-    PORT=8000
-
-# Run database migrations
-RUN alembic upgrade head
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=8000 \
+    WORKERS=4
 
 # Expose port
 EXPOSE 8000
 
-# Run the application with Gunicorn
-CMD ["gunicorn", "app.main:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"] 
+# Use production entrypoint
+CMD ["/app/entrypoint-prod.sh"] 

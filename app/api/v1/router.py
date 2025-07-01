@@ -16,6 +16,7 @@ from app.api.v1.endpoints import (
     agent_debug,
     auth,
     github_auth,
+    google_auth,
 )
 
 # Health check endpoint
@@ -25,7 +26,10 @@ api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 
 # GitHub OAuth endpoints  
-api_router.include_router(github_auth.router, prefix="/github/auth", tags=["github-auth"])
+api_router.include_router(github_auth.router, prefix="/auth/github", tags=["github-auth"])
+
+# Google OAuth endpoints  
+api_router.include_router(google_auth.router, prefix="/auth/google", tags=["google-auth"])
 
 # User management
 api_router.include_router(users.router, prefix="/users", tags=["users"])

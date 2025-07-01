@@ -2,15 +2,47 @@
 
 This guide will help you get AgentLogger up and running quickly. AgentLogger is a production-ready AI-powered debugging tool with a modern web interface and robust API.
 
-## Prerequisites
+## 🚀 Quick Start (30 seconds)
 
-Before you begin, ensure you have:
+The absolute fastest way to get AgentLogger running:
 
-- **Docker and Docker Compose** installed on your system
+```bash
+# 1. Clone and enter directory
+git clone https://github.com/your-username/AgentLogger.git && cd AgentLogger
+
+# 2. Set your Groq API key (get free at console.groq.com)
+export GROQ_API_KEY="your_groq_api_key_here"
+
+# 3. Launch everything with Docker
+docker-compose up -d
+
+# 4. Open in browser
+open http://localhost  # macOS
+# or visit http://localhost manually
+```
+
+That's it! 🎉 AgentLogger is now running with:
+- ✅ Beautiful web interface at http://localhost
+- ✅ Complete API at http://localhost/api/v1
+- ✅ Interactive playground and documentation
+
+## 📋 Prerequisites
+
+### Essential Requirements
+- **Git** - For cloning the repository
 - **Groq API Key** - Get one free at [console.groq.com](https://console.groq.com)
-- **Git** for cloning the repository
 
-## Step 1: Get Your Groq API Key
+### Choose Your Installation Method
+
+| Method | Requirements | Best For |
+|--------|--------------|----------|
+| **🐳 Docker** (Recommended) | Docker & Docker Compose | Quick setup, consistent environment |
+| **💻 Manual** | Python 3.11+, Node.js 18+ | Development, customization |
+| **☁️ Cloud** | Cloud account | Production deployment |
+
+## Method 1: Docker Deployment (Recommended) 🐳
+
+### Step 1: Get Your Groq API Key
 
 1. Visit [console.groq.com](https://console.groq.com)
 2. Sign up or log in to your account
@@ -20,21 +52,22 @@ Before you begin, ensure you have:
 
 ⚠️ **Important**: Keep your API key secure and never commit it to version control.
 
-## Step 2: Clone and Configure
+### Step 2: Clone and Configure
 
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/AgentLogger.git
 cd AgentLogger
 
-# Option 1: Set API key in docker-compose.yml
-# Edit docker-compose.yml and replace the GROQ_API_KEY placeholder
-
-# Option 2: Export as environment variable (recommended)
+# Option 1: Export as environment variable (recommended)
 export GROQ_API_KEY="your_groq_api_key_here"
+
+# Option 2: Create .env file
+cp env.example .env
+# Edit .env and set GROQ_API_KEY=your_actual_key
 ```
 
-## Step 3: Launch the Application
+### Step 3: Launch the Application
 
 ```bash
 # Start all services (this may take a few minutes on first run)
@@ -47,25 +80,106 @@ docker-compose ps
 docker-compose logs -f
 ```
 
-You should see:
-- ✅ Frontend service running on port 8082
-- ✅ Backend service running on port 8000  
-- ✅ Database service running on port 5432
-- ✅ Nginx proxy running on port 80
+**Services Started:**
+- ✅ Frontend (React) - Port 8080
+- ✅ Backend (FastAPI) - Port 8000  
+- ✅ Database (SQLite) - Embedded
+- ✅ Nginx Proxy - Port 80
 
-## Step 4: Access the Application
+### Step 4: Access the Application
 
-### Web Interface (Recommended)
-- **Main Application**: http://localhost
-- **API Documentation**: http://localhost/docs
+| Service | URL | Description |
+|---------|-----|-------------|
+| 🌐 **Main App** | http://localhost | Beautiful web interface |
+| 🎮 **Playground** | http://localhost/playground | Interactive testing |
+| 📊 **Dashboard** | http://localhost/dashboard | Analytics & management |
+| 🔑 **API Keys** | http://localhost/api-keys | Key management |
+| 📚 **API Docs** | http://localhost/docs | Complete API reference |
+| 🔧 **Backend Direct** | http://localhost:8000 | Direct API access |
 
-### Direct Service Access
-- **Frontend**: http://localhost:8082 (React development server)
-- **Backend**: http://localhost:8000 (FastAPI server)
+## Method 2: Manual Installation 💻
 
-## Step 5: API Key Management
+### Full Manual Setup
 
-AgentLogger includes a comprehensive API key management system:
+**Best for**: Development, learning the system, customization
+
+```bash
+# 1. Clone repository
+git clone https://github.com/your-username/AgentLogger.git
+cd AgentLogger
+
+# 2. Backend Setup
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# 3. Environment Configuration
+cp env.example .env
+# Edit .env file and set GROQ_API_KEY=your_key
+
+# 4. Database Setup
+python scripts/init_db.py
+
+# 5. Start Backend (in one terminal)
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+# 6. Frontend Setup (in another terminal)
+cd frontend
+npm install
+npm run dev
+
+# 7. Access Application
+# Frontend: http://localhost:8080
+# Backend: http://localhost:8000
+```
+
+### Backend Only Setup
+
+**Best for**: API-only usage, custom frontend, CLI development
+
+```bash
+# Quick backend setup
+git clone https://github.com/your-username/AgentLogger.git
+cd AgentLogger
+
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Configure
+cp env.example .env
+# Set GROQ_API_KEY in .env file
+
+# Initialize database
+python scripts/init_db.py
+
+# Start API server
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# Test API
+curl http://localhost:8000/api/v1/health/
+```
+
+## Method 3: CLI Installation 🖥️
+
+### Install and Use CLI
+
+```bash
+# Install AgentLogger CLI
+cd cli
+pip install -e .
+
+# Configure with your API key
+agent-logger configure --api-key YOUR_API_KEY --api-url http://localhost:8000/api/v1
+
+# Test CLI
+agent-logger analyze --file test_file.py
+agent-logger explain --code "print(hello world)" --language python
+```
+
+## 🔑 API Key Management
+
+AgentLogger includes a comprehensive API key management system accessible through the web interface.
 
 ### Default API Key
 For immediate testing, use this pre-configured key:
@@ -74,14 +188,17 @@ QwF6KA863mAeRHOCY9HJJEccV9Gp0chKTL5pogRjeOU
 ```
 
 ### Create Your Own API Keys
-1. Navigate to http://localhost
-2. Click **"API Keys"** in the navigation bar
-3. Click **"Create API Key"**
-4. Enter a name (e.g., "My Test Key")
-5. Copy the generated key immediately (it's only shown once)
+1. Navigate to http://localhost/api-keys
+2. Click **"Create API Key"**
+3. Enter a descriptive name (e.g., "Development Key")
+4. Copy the generated key immediately (it's only shown once)
+5. Use the key in your API requests
 
 ### Using API Keys
-Include your API key in all requests:
+
+**Web Interface**: Keys are automatically used when logged in
+
+**API Requests**: Include in headers:
 ```bash
 curl -X POST http://localhost/api/v1/analyze \
   -H "Content-Type: application/json" \
@@ -89,24 +206,30 @@ curl -X POST http://localhost/api/v1/analyze \
   -d '{"code": "print(hello world)", "language": "python"}'
 ```
 
-## Step 6: Test the System
+**CLI**: Configure once with `agent-logger configure`
+
+## 🧪 Test the System
 
 ### Via Web Interface
 1. Go to http://localhost
-2. Click **"Playground"** in the navigation
-3. Paste some buggy code:
+2. Navigate to **"Playground"**
+3. Paste buggy code:
    ```python
+   # Example buggy Python code
    print(hello world)
    for i in range(5
        print(i)
    ```
 4. Select language: **Python**
 5. Click **"Analyze"**
-6. View the analysis results and suggested fixes
+6. View the AI-powered analysis and suggested fixes
 
 ### Via API
 ```bash
-# Test the analysis endpoint
+# Test health endpoint
+curl http://localhost/api/v1/health/
+
+# Test analysis endpoint
 curl -X POST http://localhost/api/v1/analyze \
   -H "Content-Type: application/json" \
   -H "X-API-Key: QwF6KA863mAeRHOCY9HJJEccV9Gp0chKTL5pogRjeOU" \
@@ -115,7 +238,7 @@ curl -X POST http://localhost/api/v1/analyze \
     "language": "python"
   }' | jq '.'
 
-# Test the explanation endpoint
+# Test explanation endpoint  
 curl -X POST http://localhost/api/v1/explain \
   -H "Content-Type: application/json" \
   -H "X-API-Key: QwF6KA863mAeRHOCY9HJJEccV9Gp0chKTL5pogRjeOU" \
@@ -124,133 +247,224 @@ curl -X POST http://localhost/api/v1/explain \
     "traceback": "SyntaxError: invalid syntax",
     "language": "python"
   }' | jq '.'
+
+# Test fix generation
+curl -X POST http://localhost/api/v1/fix \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: QwF6KA863mAeRHOCY9HJJEccV9Gp0chKTL5pogRjeOU" \
+  -d '{
+    "code": "print(hello world)",
+    "language": "python",
+    "errors": ["SyntaxError: invalid syntax"]
+  }' | jq '.'
 ```
 
-## Navigation Guide
+## 🌐 Explore the Interface
 
-AgentLogger's web interface includes several key pages:
+### 🏠 Home Page
+- Welcome screen with overview
+- Quick action buttons
+- System status indicators
 
-### 🏠 **Home Page** (/)
-- Landing page with overview
-- Links to key features
+### 🎮 Playground
+- **Interactive Code Editor**: Paste or type code
+- **Language Selection**: Python, JavaScript, Java, etc.
+- **Real-time Analysis**: Get instant feedback
+- **Fix Generation**: AI-powered code corrections
+- **Error Explanation**: Detailed error breakdowns
 
-### 🎮 **Playground** (/playground)
-- Interactive code analysis
-- Real-time syntax checking
-- Fix generation and explanation
+### 📊 Dashboard  
+- **Usage Analytics**: API call statistics
+- **Recent Activity**: Latest analyses and fixes
+- **Performance Metrics**: Response times and success rates
+- **API Key Usage**: Track usage by key
 
-### 📊 **Dashboard** (/dashboard)
-- Analysis history
-- Recent activities
-- Quick statistics
+### 🔑 API Keys
+- **Create Keys**: Generate new API keys with custom names
+- **View Keys**: See all your active keys (values hidden for security)
+- **Copy Keys**: One-click copy to clipboard
+- **Delete Keys**: Remove unused or compromised keys
+- **Usage Stats**: See which keys are being used
 
-### 🔑 **API Keys** (/api-keys)
-- Create new API keys
-- View existing keys
-- Delete unused keys
-- Copy keys to clipboard
+### 📚 Documentation
+- **API Reference**: Complete endpoint documentation
+- **Code Examples**: Copy-paste examples in multiple languages
+- **Authentication**: How to use API keys
+- **Rate Limits**: Understanding usage limits
 
-### 📚 **Documentation** (/docs)
-- API reference
-- Usage guides
-- Examples
+## 🎯 Common Use Cases
 
-### 🔐 **Sign In** (/signin)
-- Authentication page
-- GitHub OAuth integration
-
-## Common Use Cases
-
-### 1. Quick Code Check
+### 1. Quick Syntax Check
 ```python
-# Paste this in the Playground
+# Paste this in Playground to see syntax error detection
 def fibonacci(n):
     if n <= 1:
         return n
     else:
-        return fibonacci(n-1) + fibonacci(n-2
+        return fibonacci(n-1) + fibonacci(n-2  # Missing closing parenthesis
 ```
 
-### 2. Error Analysis
+### 2. Debug Runtime Errors
 ```python
-# Code with multiple issues
-import os
-print("Hello World"
-for i in range(10)
-    print(i
+# Example with logic errors
+def divide_numbers(a, b):
+    return a / b  # Will fail with ZeroDivisionError
+
+result = divide_numbers(10, 0)
 ```
 
-### 3. API Integration
+### 3. Code Quality Analysis
+```python
+# Example with style and performance issues
+def bad_function():
+    numbers = []
+    for i in range(1000):
+        numbers.append(i)
+    return numbers
+```
+
+### 4. API Integration
 ```javascript
-// Example: Integrating with your IDE
-fetch('http://localhost/api/v1/analyze', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-API-Key': 'your-api-key'
-  },
-  body: JSON.stringify({
-    code: userCode,
-    language: 'python'
-  })
-})
-.then(response => response.json())
-.then(data => console.log(data));
+// Example: Integrating AgentLogger into your IDE or editor
+async function analyzeCode(code, language) {
+    const response = await fetch('http://localhost/api/v1/analyze', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': 'your-api-key'
+        },
+        body: JSON.stringify({ code, language })
+    });
+    
+    const result = await response.json();
+    return result;
+}
 ```
 
-## Troubleshooting
+## ✅ Verification Steps
 
-### Services Not Starting
+### 1. Check All Services
 ```bash
-# Check Docker is running
-docker --version
-docker-compose --version
+# Docker method
+docker-compose ps
 
-# View service logs
-docker-compose logs backend
-docker-compose logs frontend
-docker-compose logs db
+# Manual method
+curl http://localhost:8000/api/v1/health/  # Backend health
+curl http://localhost:8080  # Frontend (if running manually)
+curl http://localhost  # Main app (Docker)
 ```
 
-### API Key Issues
-- Ensure your Groq API key is valid and has sufficient credits
-- Check that the key is properly set in environment variables
-- Verify the key format (should start with `gsk_`)
+### 2. Test Core Functionality
+1. **Health Check**: Visit http://localhost/api/v1/health/ 
+2. **Web Interface**: Navigate through all pages
+3. **API Key Creation**: Create a new key in the web interface
+4. **Code Analysis**: Test the playground with sample code
+5. **API Access**: Make direct API calls
 
-### CORS Errors
-The application is configured for common development ports. If you're running on different ports, check `app/main.py` CORS configuration.
-
-### Database Issues
+### 3. Verify Database
 ```bash
-# Reset database if needed
-docker-compose down -v
-docker-compose up -d
-
-# Check database status
-docker-compose exec db psql -U postgres -d agentlogger -c "\dt"
+# Check if database was created and populated
+# Docker method
+docker-compose exec backend python -c "
+from app.core.db import SessionLocal
+from app.models.db.user import User
+session = SessionLocal()
+users = session.query(User).all()
+print(f'Found {len(users)} users in database')
+session.close()
+"
 ```
 
-## Next Steps
+## 🛠️ Troubleshooting
 
-1. **Explore the API**: Visit http://localhost/docs for interactive API documentation
-2. **Check Configuration**: See [Configuration Guide](configuration.md) for advanced settings
-3. **Development Setup**: See [Development Setup](../development/development-setup.md) for local development
-4. **Agent Architecture**: Learn about the system design in [Agent Architecture](../development/agent-architecture.md)
+### Common Issues
 
-## Support
+**Port Already in Use:**
+```bash
+# Check what's using the ports
+lsof -i :8000  # Backend
+lsof -i :8080  # Frontend  
+lsof -i :80    # Nginx
 
-- **Issues**: Create a GitHub issue for bugs or feature requests
-- **Documentation**: Check other guides in the `docs/` directory
-- **FAQ**: See [FAQ](faq.md) for common questions
+# Kill processes if needed
+sudo kill -9 PID_NUMBER
+```
 
-## What's Next?
+**Docker Issues:**
+```bash
+# Reset Docker completely
+docker-compose down
+docker system prune -f
+docker-compose pull
+docker-compose up -d --build
+```
 
-Now that you have AgentLogger running:
+**Environment Variables Not Set:**
+```bash
+# Check if Groq API key is set
+echo $GROQ_API_KEY
+cat .env | grep GROQ_API_KEY
 
-1. Try analyzing different types of code issues
-2. Explore the API endpoints
-3. Create and manage your API keys
-4. Check out the agent workflow in action
-5. Consider contributing to the project
+# If empty, set it:
+export GROQ_API_KEY="your_key_here"
+```
 
-Happy debugging! 🐛✨ 
+**Database Connection Issues:**
+```bash
+# Reset database (development only)
+rm -f agentlogger.db  # SQLite file
+python scripts/init_db.py  # Recreate
+```
+
+**Frontend Build Issues:**
+```bash
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+npm run build
+```
+
+### Getting Help
+
+**Can't Access Web Interface?**
+- Check if all services are running: `docker-compose ps`
+- Try different browsers or incognito mode
+- Check firewall settings
+
+**API Returning Errors?**
+- Verify your Groq API key is valid
+- Check API key permissions in the web interface
+- Look at backend logs: `docker-compose logs backend`
+
+**Slow Performance?**
+- Check your internet connection (Groq API requires internet)
+- Monitor system resources: `docker stats`
+- Try restarting services: `docker-compose restart`
+
+## 📚 Next Steps
+
+After successful setup:
+
+1. **🎮 Try the Playground** - Test with your own code
+2. **🔑 Create API Keys** - Set up authentication for your projects
+3. **📖 Read the Docs** - Explore full API capabilities
+4. **🛠️ Set Up Development** - If you want to contribute or customize
+5. **🚀 Deploy to Production** - See the deployment guide for cloud setup
+
+### Recommended Learning Path
+
+1. **Start with Web Interface** - Get familiar with all features
+2. **Try API Calls** - Use curl or Postman to test endpoints
+3. **Install CLI** - For command-line usage
+4. **Read Architecture Docs** - Understand how it works internally
+5. **Contribute** - Help improve AgentLogger
+
+## 🆘 Need More Help?
+
+- **📚 Full Documentation**: Check all guides in `docs/` directory
+- **🐛 Found a Bug?**: Open an issue on GitHub
+- **💬 Questions?**: Join our GitHub Discussions
+- **📧 Contact**: Reach out to the development team
+- **🔧 Advanced Setup**: See `docs/guides/deployment.md` for production deployment
+
+Welcome to AgentLogger! 🎉 Start debugging with AI-powered assistance! 
