@@ -20,7 +20,7 @@ services:
       dockerfile: Dockerfile
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/agentlogger
-      - GROQ_API_KEY=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
+      - GROQ_API_KEY=${GROQ_API_KEY}
       - GROQ_MODEL=llama3-70b-8192
     ports:
       - "8000:8000"
