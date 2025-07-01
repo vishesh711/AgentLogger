@@ -10,7 +10,7 @@ from app.models.schemas.fix import FixRequestCreate, FixRequestResponse, FixResu
 from app.services.fix_service import (
     create_fix_request, get_fix_request, 
     get_fix_requests_by_user, get_fix_requests_by_analysis,
-    generate_fix
+    generate_fix, process_fix_with_agents, process_fix_direct
 )
 from app.services.github_service import create_github_pr
 from app.agents.agent_system import AgentSystem

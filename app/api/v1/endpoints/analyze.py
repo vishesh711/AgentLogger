@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
-from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
+from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED
 
 from app.core.db import get_db
 from app.models.schemas.analysis import (
@@ -11,7 +11,7 @@ from app.models.schemas.analysis import (
 )
 from app.services.analysis_service import (
     create_analysis_request, get_analysis_request, 
-    get_analysis_requests_by_user, analyze_code_with_agents, analyze_code_direct
+    get_analysis_requests_by_user, analyze_code_with_agents, analyze_code_direct, analyze_code
 )
 from app.agents.agent_system import AgentSystem
 
@@ -32,7 +32,7 @@ async def analyze_code_background(db: Session, analysis_id: UUID, agent_system: 
         print(f"Background analysis failed: {e}")
 
 
-@router.post("/", response_model=AnalysisRequestResponse)
+@router.post("", response_model=AnalysisRequestResponse)
 async def create_analysis(
     analysis_data: AnalysisRequestCreate,
     request: Request,
@@ -49,8 +49,8 @@ async def create_analysis(
     user_id = getattr(request.state, 'user_id', None)
     if not user_id:
         raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail="User ID not found in request. API key authentication failed."
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Please provide a valid API key."
         )
     
     # Create the analysis request
@@ -75,8 +75,8 @@ async def get_analysis(
     user_id = getattr(request.state, 'user_id', None)
     if not user_id:
         raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail="User ID not found in request. API key authentication failed."
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Please provide a valid API key."
         )
     
     analysis = await get_analysis_request(db, analysis_id)
@@ -96,7 +96,7 @@ async def get_analysis(
     return analysis
 
 
-@router.get("/", response_model=List[AnalysisRequestResponse])
+@router.get("", response_model=List[AnalysisRequestResponse])
 async def get_user_analyses(
     request: Request,
     skip: int = 0,
@@ -110,8 +110,8 @@ async def get_user_analyses(
     user_id = getattr(request.state, 'user_id', None)
     if not user_id:
         raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail="User ID not found in request. API key authentication failed."
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Please provide a valid API key."
         )
     
     return await get_analysis_requests_by_user(db, UUID(user_id), skip, limit)
@@ -132,8 +132,8 @@ async def run_analysis(
     user_id = getattr(request.state, 'user_id', None)
     if not user_id:
         raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail="User ID not found in request. API key authentication failed."
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Please provide a valid API key."
         )
     
     # Get the analysis request

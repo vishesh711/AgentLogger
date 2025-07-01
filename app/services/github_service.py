@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.models.db.github import GitHubPR, PRStatus
 from app.models.db.fix import FixRequest
 from app.models.schemas.fix import FixRequestResponse
+from app.services.fix_service import get_fix_request
 
 
 class GitHubService:
