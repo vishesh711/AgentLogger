@@ -42,6 +42,9 @@ class FixRequest(BaseModel):
     status = Column(Enum(FixStatus), nullable=False, default=FixStatus.PENDING)
     validation_message = Column(Text, nullable=True)
     
+    # Agent system tracking
+    session_id = Column(String, nullable=True)  # Track agent system session
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

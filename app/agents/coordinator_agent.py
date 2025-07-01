@@ -138,21 +138,18 @@ class CoordinatorAgent(BaseAgent):
     
     async def create_debugging_plan(self, code: str, language: str, error_message: Optional[str]) -> List[Dict[str, Any]]:
         """Create a plan for debugging the code."""
-        # Start with a basic plan
+        # Start with a basic plan using actual available agents
         plan = [
             {"step": "analyze", "agent": "analyzer", "status": "pending"},
-            {"step": "explain", "agent": "explainer", "status": "pending"},
-            {"step": "fix", "agent": "fix_generator", "status": "pending"},
-            {"step": "test", "agent": "test", "status": "pending"}
+            {"step": "fix", "agent": "fix_generator", "status": "pending"}
         ]
         
-        # If there's an error message, we can skip analysis
+        # If there's an error message, we can skip analysis and go straight to fixing
         if error_message:
             plan[0]["status"] = "skipped"
         
-        # Add PR creation step if GitHub integration is enabled
-        # This would be determined by config or user preference
-        plan.append({"step": "create_pr", "agent": "pr", "status": "pending"})
+        # Note: We're not including explainer, test, and PR steps for now
+        # since those agents are not implemented yet
         
         return plan
     
@@ -289,8 +286,14 @@ class CoordinatorAgent(BaseAgent):
             "session_id": session_id,
             "issues": session["issues"],
             "fixes": session["fixes"],
-            "pr_info": session.get("pr_info", {})
+            "pr_info": session.get("pr_info", {}),
+            "final_state": session["state"],
+            "plan_status": session["plan"]
         }
+        
+        # Log the final results for debugging
+        self.log(f"🎉 Session {session_id} completed successfully!")
+        self.log(f"Final summary: {summary}")
         
         # Send the summary to the user
         message = Message(
@@ -302,6 +305,14 @@ class CoordinatorAgent(BaseAgent):
         
         await self.send_message(message)
         
-        # Clean up the session
+        # For debugging: Store the final result before deletion
+        session["_final_summary"] = summary
+        session["_completed_at"] = "2025-07-01T03:30:00Z"  # Timestamp for debugging
+        
+        # Clean up the session after a delay to allow debugging
         # In a real system, we might archive it instead
-        del self.active_sessions[session_id] 
+        await asyncio.sleep(5)  # Keep session for 5 seconds for debugging
+        
+        if session_id in self.active_sessions:  # Check if still exists
+            del self.active_sessions[session_id]
+            self.log(f"Session {session_id} cleaned up") 

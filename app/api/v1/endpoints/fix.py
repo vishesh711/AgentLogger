@@ -12,39 +12,102 @@ from app.services.fix_service import (
     get_fix_requests_by_user, get_fix_requests_by_analysis,
     generate_fix
 )
+from app.services.github_service import create_github_pr
+from app.agents.agent_system import AgentSystem
+from app.core.dependencies import get_agent_system_dependency
 
 router = APIRouter()
 
 
+async def process_fix_background(db: Session, fix_id: str, agent_system: AgentSystem = None):
+    """Background task to process fix request"""
+    try:
+        from app.models.db.fix import FixRequest, FixStatus
+        from datetime import datetime
+        
+        # Get the fix request
+        db_fix_request = db.query(FixRequest).filter(FixRequest.id == fix_id).first()
+        if not db_fix_request:
+            return
+        
+        # Update status
+        db_fix_request.status = FixStatus.PROCESSING
+        db.commit()
+        
+        try:
+            # Try to use the agent system for comprehensive fix generation
+            if agent_system:
+                fix_result = await process_fix_with_agents(db, db_fix_request, agent_system)
+            else:
+                # Fallback to direct Groq if agent system is not available
+                print("Agent system not provided for fix generation, falling back to direct fix")
+                fix_result = await process_fix_direct(db_fix_request)
+            
+            # Simple validation (just check if we got a fix)
+            is_valid = bool(fix_result.get("fixed_code"))
+            validation_message = "Fix generated successfully" if is_valid else "No fix generated"
+            
+            # Update the fix request
+            db_fix_request.fixed_code = fix_result["fixed_code"]
+            db_fix_request.explanation = fix_result["explanation"]
+            db_fix_request.status = FixStatus.COMPLETED if is_valid else FixStatus.FAILED
+            db_fix_request.validation_message = validation_message
+            db_fix_request.completed_at = datetime.utcnow()
+            
+            db.commit()
+            
+        except Exception as e:
+            # Handle errors
+            db_fix_request.status = FixStatus.FAILED
+            db_fix_request.validation_message = f"Error processing fix: {str(e)}"
+            db.commit()
+            
+    except Exception as e:
+        print(f"Background fix processing failed: {e}")
+
+
 @router.post("/", response_model=FixRequestResponse)
 async def create_fix(
+    fix_request: FixRequestCreate,
     request: Request,
-    fix_data: FixRequestCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    agent_system: AgentSystem = Depends(get_agent_system_dependency),
 ):
     """
-    Create a new fix request for an issue
+    Create a new fix request
     
-    The fix will be generated asynchronously in the background.
+    The fix generation will run asynchronously in the background.
     """
     # Get user_id from request state (set by the API key middleware)
-    user_id = request.state.user_id
-    
-    try:
-        # Create the fix request
-        fix = await create_fix_request(db, fix_data, user_id)
-        
-        # Generate the fix in the background
-        background_tasks.add_task(generate_fix, db, fix.id)
-        
-        return fix
-    
-    except ValueError as e:
+    user_id = getattr(request.state, 'user_id', None)
+    if not user_id:
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="User ID not found in request. API key authentication failed."
         )
+    
+    # Create the fix request directly in the database
+    from app.models.db.fix import FixRequest, FixStatus
+    
+    db_fix_request = FixRequest(
+        user_id=user_id,
+        code=fix_request.code,
+        language=fix_request.language,
+        error_message=fix_request.error_message,
+        context=fix_request.context,
+        analysis_id=fix_request.analysis_id,
+        status=FixStatus.PENDING
+    )
+    
+    db.add(db_fix_request)
+    db.commit()
+    db.refresh(db_fix_request)
+    
+    # Start the fix process in the background
+    background_tasks.add_task(process_fix_background, db, str(db_fix_request.id), agent_system)
+    
+    return FixRequestResponse.model_validate(db_fix_request)
 
 
 @router.get("/{fix_id}", response_model=FixRequestResponse)
@@ -76,7 +139,12 @@ async def get_user_fixes(
     Get all fix requests for the current user
     """
     # Get user_id from request state (set by the API key middleware)
-    user_id = request.state.user_id
+    user_id = getattr(request.state, 'user_id', None)
+    if not user_id:
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="User ID not found in request. API key authentication failed."
+        )
     
     return await get_fix_requests_by_user(db, user_id, skip, limit)
 

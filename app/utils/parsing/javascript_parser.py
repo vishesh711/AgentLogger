@@ -227,4 +227,28 @@ class JavaScriptParser(BaseParser):
                 if not stack or stack.pop() != brackets[char]:
                     return True
         
-        return len(stack) > 0 
+        return len(stack) > 0
+
+    def get_syntax_issues(self, parsed_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Extract JavaScript-specific syntax issues from parsed data
+        
+        Args:
+            parsed_data: Dictionary with parsed information from parse() method
+            
+        Returns:
+            List of syntax issues found in the JavaScript code
+        """
+        issues = []
+        
+        # Check if there's an error in the parsed data
+        if "error" in parsed_data:
+            error = parsed_data["error"]
+            issues.append({
+                "message": error.get("message", "JavaScript syntax error"),
+                "line": error.get("line", 1),
+                "column": error.get("column", 1),
+                "type": error.get("type", "SyntaxError")
+            })
+        
+        return issues 

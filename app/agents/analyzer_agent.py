@@ -174,17 +174,28 @@ class AnalyzerAgent(BaseAgent):
         issues = []
         
         try:
-            # Create a prompt for the LLM
-            prompt = self.create_analysis_prompt(code, language, error_message)
+            # Use the Groq client's analyze_code method which is properly designed
+            llm_issues = await self.llm_client.analyze_code(code, language)
             
-            # Call the LLM
-            response = await self.llm_client.generate_text(prompt)
+            # Convert CodeIssue objects to dictionaries
+            for issue in llm_issues:
+                issues.append({
+                    "type": issue.type,
+                    "message": issue.message,
+                    "line_start": issue.line_start,
+                    "line_end": issue.line_end or issue.line_start,
+                    "column_start": getattr(issue, 'column_start', None),
+                    "column_end": getattr(issue, 'column_end', None),
+                    "severity": issue.severity,
+                    "confidence": 0.9  # Default confidence since CodeIssue doesn't have this field
+                })
             
-            # Parse the response
-            parsed_issues = self.parse_llm_response(response)
-            issues.extend(parsed_issues)
+            self.log(f"LLM analysis found {len(issues)} issues")
+            
         except Exception as e:
             self.log(f"Error in LLM analysis: {str(e)}", level="ERROR")
+            import traceback
+            self.log(f"Traceback: {traceback.format_exc()}", level="ERROR")
         
         return issues
     

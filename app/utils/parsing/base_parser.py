@@ -99,4 +99,28 @@ class BaseParser:
             Processed fixed code
         """
         # Base implementation returns code unchanged
-        return fixed_code 
+        return fixed_code
+
+    def get_syntax_issues(self, parsed_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Extract syntax issues from parsed data
+        
+        Args:
+            parsed_data: Dictionary with parsed information from parse() method
+            
+        Returns:
+            List of syntax issues found in the code
+        """
+        issues = []
+        
+        # Check if there's an error in the parsed data
+        if "error" in parsed_data:
+            error = parsed_data["error"]
+            issues.append({
+                "message": error.get("message", "Syntax error"),
+                "line": error.get("line", 1),
+                "column": error.get("column", 1),
+                "type": error.get("type", "SyntaxError")
+            })
+        
+        return issues 

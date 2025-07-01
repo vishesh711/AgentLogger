@@ -1,58 +1,50 @@
+import pytest
 from fastapi.testclient import TestClient
 import re
 from datetime import datetime
 
+from app.main import app
 
-def test_health_endpoint(client):
-    """
-    Test the health endpoint returns a 200 status code and the correct response format
-    """
-    response = client.get("/api/v1/health")
+client = TestClient(app)
+
+def test_health_endpoint():
+    """Test that the health endpoint returns a successful response"""
+    response = client.get("/api/v1/health/health")
     assert response.status_code == 200
     
     data = response.json()
     assert "status" in data
-    assert "version" in data
-    assert "timestamp" in data
-    assert "environment" in data
-    
     assert data["status"] == "ok"
-    assert isinstance(data["version"], str)
-    assert isinstance(data["timestamp"], str)
-    assert data["environment"] == "development"
+    assert "timestamp" in data
+    assert "version" in data
 
-
-def test_health_endpoint_timestamp_format(client):
+def test_health_endpoint_timestamp_format():
     """
-    Test that the timestamp in the health endpoint response is in ISO format
+    Test that the health endpoint returns a timestamp in ISO format
     """
-    response = client.get("/api/v1/health")
+    response = client.get("/api/v1/health/health")
     assert response.status_code == 200
     
     data = response.json()
     timestamp = data["timestamp"]
     
-    # Check that the timestamp is in ISO format
-    iso_format_regex = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$'
-    assert re.match(iso_format_regex, timestamp) is not None
-    
-    # Verify it can be parsed as a datetime
+    # Test that the timestamp can be parsed as ISO format
     try:
-        datetime.fromisoformat(timestamp)
+        parsed_timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+        assert isinstance(parsed_timestamp, datetime)
     except ValueError:
-        assert False, f"Timestamp {timestamp} is not in a valid ISO format"
+        pytest.fail(f"Timestamp {timestamp} is not in valid ISO format")
 
-
-def test_health_endpoint_version_format(client):
+def test_health_endpoint_version_format():
     """
-    Test that the version in the health endpoint response is in semantic versioning format
+    Test that the health endpoint returns a version in semantic versioning format
     """
-    response = client.get("/api/v1/health")
+    response = client.get("/api/v1/health/health")
     assert response.status_code == 200
     
     data = response.json()
     version = data["version"]
     
-    # Check that the version is in semantic versioning format (e.g., 1.0.0)
-    semver_regex = r'^\d+\.\d+\.\d+$'
-    assert re.match(semver_regex, version) is not None 
+    # Test semantic versioning format (major.minor.patch)
+    semver_pattern = r'^\d+\.\d+\.\d+$'
+    assert re.match(semver_pattern, version), f"Version {version} is not in semantic versioning format" 

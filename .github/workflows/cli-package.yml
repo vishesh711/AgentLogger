@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -21,12 +21,18 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install build twine
+        pip install build twine wheel setuptools
     
-    - name: Build package
+    - name: Lint CLI package
+      run: |
+        pip install flake8
+        flake8 cli/ --count --select=E9,F63,F7,F82 --show-source --statistics
+    
+    - name: Test CLI package build
       run: |
         cd cli
-        python -m build
+        python -m build --wheel --sdist
+        twine check dist/*
     
     - name: Publish to PyPI
       if: github.event_name == 'release'
@@ -35,9 +41,11 @@ jobs:
         user: __token__
         password: ${{ secrets.PYPI_API_TOKEN }}
         packages-dir: cli/dist/
+        verify-metadata: true
     
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: packages
-        path: cli/dist/ 
+        name: cli-packages
+        path: cli/dist/
+        retention-days: 30 

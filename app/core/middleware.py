@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
-from app.core.db import get_db
+from app.core.db import get_db, SessionLocal
 from app.services.api_key_service import verify_api_key_service, validate_api_key
 from app.services.monitoring_service import monitoring_service
 
@@ -57,7 +57,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         client_id = request.headers.get("X-API-Key") or request.client.host
         
         # Skip rate limiting for certain paths
-        if request.url.path == "/api/v1/health/health":
+        if request.url.path in ["/api/v1/health", "/api/v1/health/health", "/docs", "/redoc", "/openapi.json"]:
             return await call_next(request)
         
         # Check rate limit
@@ -94,18 +94,24 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: FastAPI):
         super().__init__(app)
         self.public_paths = [
+            "/docs",
+            "/redoc", 
+            "/openapi.json",
             "/api/v1/docs",
-            "/api/v1/redoc",
+            "/api/v1/redoc", 
             "/api/v1/openapi.json",
+            "/api/v1/health",
             "/api/v1/health/health",
             "/api/v1/users",
             "/",
+            "/favicon.ico",
         ]
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Skip authentication for public paths
+        request_path = request.url.path
         for path in self.public_paths:
-            if request.url.path.endswith(path):
+            if request_path == path or request_path.startswith(path):
                 return await call_next(request)
         
         # Get API key from header
@@ -116,19 +122,26 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
                 content={"detail": "API key required"},
             )
         
-        # Validate API key
-        user_id = await validate_api_key(api_key)
-        if not user_id:
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Invalid API key"},
-            )
+        # Create database session for validation
+        db = SessionLocal()
         
-        # Store user_id in request state
-        request.state.user_id = user_id
-        
-        # Continue with the request
-        return await call_next(request)
+        try:
+            # Validate API key
+            user_id = await validate_api_key(api_key, db)
+            if not user_id:
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Invalid API key"},
+                )
+            
+            # Store user_id in request state
+            request.state.user_id = user_id
+            
+            # Continue with the request
+            return await call_next(request)
+        finally:
+            # Always close the database session
+            db.close()
 
 
 class AnalyticsMiddleware(BaseHTTPMiddleware):

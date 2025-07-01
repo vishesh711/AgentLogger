@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -6,10 +7,12 @@ import os
 import logging
 from fastapi.openapi.utils import get_openapi
 import sentry_sdk
+import asyncio
 
 from app.core.config import settings
 from app.core.middleware import add_middlewares
 from app.api.v1.router import api_router
+from app.core.dependencies import get_agent_system
 
 # Configure logging
 logging.basicConfig(
@@ -33,6 +36,28 @@ if settings.SENTRY_DSN:
     )
     logger.info("Sentry integration enabled")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage the lifespan of the application"""
+    # Startup
+    try:
+        agent_sys = get_agent_system()
+        # Start the agent system in the background
+        asyncio.create_task(agent_sys.start())
+        logger.info("Agent system started")
+    except Exception as e:
+        logger.error(f"Failed to start agent system: {str(e)}")
+    
+    yield
+    
+    # Shutdown
+    try:
+        agent_sys = get_agent_system()
+        await agent_sys.stop()
+        logger.info("Agent system stopped")
+    except Exception:
+        pass
+
 # Initialize FastAPI app
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -41,13 +66,35 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
 )
 
 # Set up CORS
-if settings.CORS_ORIGINS:
+cors_origins = [str(origin) for origin in settings.CORS_ORIGINS] if settings.CORS_ORIGINS else []
+
+# Add development origins if not already present
+dev_origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",  # Default Vite port
+    "http://localhost:8080", 
+    "http://localhost:8081",  # Alternative Vite port
+    "http://localhost:8082",  # Current Vite port
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:8081",
+    "http://127.0.0.1:8082",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000"
+]
+
+for origin in dev_origins:
+    if origin not in cors_origins:
+        cors_origins.append(origin)
+
+if cors_origins:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[str(origin) for origin in settings.CORS_ORIGINS],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

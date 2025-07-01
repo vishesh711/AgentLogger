@@ -32,6 +32,9 @@ class AnalysisRequest(BaseModel):
     summary = Column(Text, nullable=True)
     error = Column(Text, nullable=True)
     
+    # Agent system tracking
+    session_id = Column(String, nullable=True)  # Track agent system session
+    
     # Foreign keys
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     

@@ -12,23 +12,30 @@ class UserBase(BaseModel):
     is_active: bool = True
 
 
-# Schema for creating a new user
+# Schema for creating a user
 class UserCreate(UserBase):
+    password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
+
+
+# Schema for user login
+class UserLogin(BaseModel):
+    email: EmailStr
     password: str
 
 
 # Schema for updating a user
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
     full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
     is_active: Optional[bool] = None
-    password: Optional[str] = None
+    github_username: Optional[str] = None
 
 
 # Schema for returning a user
 class UserResponse(UserBase):
     id: UUID
     is_superuser: bool
+    github_username: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     last_login: Optional[datetime] = None

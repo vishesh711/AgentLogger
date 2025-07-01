@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional, List, Union
 from uuid import UUID
 import secrets
 
@@ -11,33 +11,41 @@ from app.models.schemas.api_key import ApiKeyCreate, ApiKeyResponse, ApiKeyUpdat
 from app.core.db import get_db
 
 
-async def validate_api_key(api_key: str) -> Optional[str]:
+async def validate_api_key(api_key: str, db: Session = None) -> Optional[str]:
     """
     Validate an API key and return the user ID if valid
     
-    This is a convenience function that creates a database session
-    and calls verify_api_key_service
+    This is a convenience function that can create a database session
+    if none is provided, or use the provided session
     
     Args:
         api_key: API key to validate
+        db: Optional database session
         
     Returns:
         User ID if the key is valid, None otherwise
     """
-    # Get database session
-    db = next(get_db())
+    # If no database session provided, create one
+    if db is None:
+        from app.core.db import SessionLocal
+        db = SessionLocal()
+        should_close = True
+    else:
+        should_close = False
     
     try:
         # Verify the API key
-        return await verify_api_key_service(db, api_key)
+        return verify_api_key_service(db, api_key)
     finally:
-        # Close the database session
-        db.close()
+        # Close the database session only if we created it
+        if should_close:
+            db.close()
 
 
-async def create_api_key(
+def create_api_key(
     db: Session, 
-    api_key_data: ApiKeyCreate
+    api_key_data: ApiKeyCreate,
+    user_id: str
 ) -> dict:
     """
     Create a new API key for a user
@@ -45,6 +53,7 @@ async def create_api_key(
     Args:
         db: Database session
         api_key_data: API key data
+        user_id: User ID who owns the API key
         
     Returns:
         Dict with API key response and raw API key
@@ -62,7 +71,7 @@ async def create_api_key(
         key=raw_api_key,
         name=api_key_data.name,
         description=api_key_data.description,
-        user_id=api_key_data.user_id,
+        user_id=user_id,
         expires_at=expires_at
     )
     
@@ -70,35 +79,31 @@ async def create_api_key(
     db.commit()
     db.refresh(db_api_key)
     
-    # Return both the response and the raw key
-    # The raw key will only be shown once to the user
+    # Return the response matching ApiKeyCreateResponse schema
     return {
+        "key": raw_api_key,  # The actual API key value (renamed from api_key)
         "id": db_api_key.id,
         "name": db_api_key.name,
-        "description": db_api_key.description,
-        "is_active": db_api_key.is_active,
-        "created_at": db_api_key.created_at,
         "expires_at": db_api_key.expires_at,
-        "user_id": db_api_key.user_id,
-        "api_key": raw_api_key
+        "created_at": db_api_key.created_at
     }
 
 
-async def get_api_key(db: Session, api_key_id: UUID) -> Optional[ApiKey]:
+def get_api_key(db: Session, api_key_id: UUID) -> Optional[ApiKey]:
     """
     Get an API key by ID
     """
     return db.query(ApiKey).filter(ApiKey.id == api_key_id).first()
 
 
-async def get_api_key_by_key(db: Session, key: str) -> Optional[ApiKey]:
+def get_api_key_by_key(db: Session, key: str) -> Optional[ApiKey]:
     """
     Get an API key by the key string
     """
     return db.query(ApiKey).filter(ApiKey.key == key).first()
 
 
-async def get_api_keys(db: Session, user_id: str) -> list[ApiKeyResponse]:
+def get_api_keys(db: Session, user_id: str) -> list[ApiKeyResponse]:
     """
     Get all API keys for a user
     
@@ -125,7 +130,7 @@ async def get_api_keys(db: Session, user_id: str) -> list[ApiKeyResponse]:
     ]
 
 
-async def get_api_keys_by_user(db: Session, user_id: UUID) -> List[ApiKeyResponse]:
+def get_api_keys_by_user(db: Session, user_id: Union[UUID, str]) -> List[ApiKeyResponse]:
     """
     Get all API keys for a user by user ID
     
@@ -136,7 +141,10 @@ async def get_api_keys_by_user(db: Session, user_id: UUID) -> List[ApiKeyRespons
     Returns:
         List of API key responses
     """
-    db_api_keys = db.query(ApiKey).filter(ApiKey.user_id == user_id).all()
+    # Convert UUID to string if necessary for database query
+    user_id_str = str(user_id) if isinstance(user_id, UUID) else user_id
+    
+    db_api_keys = db.query(ApiKey).filter(ApiKey.user_id == user_id_str).all()
     
     return [
         ApiKeyResponse(
@@ -152,7 +160,7 @@ async def get_api_keys_by_user(db: Session, user_id: UUID) -> List[ApiKeyRespons
     ]
 
 
-async def update_api_key(db: Session, api_key_id: UUID, api_key_data: ApiKeyUpdate) -> Optional[ApiKey]:
+def update_api_key(db: Session, api_key_id: UUID, api_key_data: ApiKeyUpdate) -> Optional[ApiKey]:
     """
     Update an API key
     
@@ -164,7 +172,7 @@ async def update_api_key(db: Session, api_key_id: UUID, api_key_data: ApiKeyUpda
     Returns:
         Updated API key or None if not found
     """
-    db_api_key = await get_api_key(db, api_key_id)
+    db_api_key = get_api_key(db, api_key_id)
     if not db_api_key:
         return None
     
@@ -183,7 +191,7 @@ async def update_api_key(db: Session, api_key_id: UUID, api_key_data: ApiKeyUpda
     return db_api_key
 
 
-async def delete_api_key(db: Session, api_key_id: UUID) -> bool:
+def delete_api_key(db: Session, api_key_id: UUID) -> bool:
     """
     Delete an API key
     
@@ -194,7 +202,7 @@ async def delete_api_key(db: Session, api_key_id: UUID) -> bool:
     Returns:
         True if deleted, False if not found
     """
-    db_api_key = await get_api_key(db, api_key_id)
+    db_api_key = get_api_key(db, api_key_id)
     if not db_api_key:
         return False
     
@@ -203,7 +211,7 @@ async def delete_api_key(db: Session, api_key_id: UUID) -> bool:
     return True
 
 
-async def revoke_api_key(db: Session, key_id: str, user_id: str) -> bool:
+def revoke_api_key(db: Session, key_id: str, user_id: str) -> bool:
     """
     Revoke an API key
     
@@ -229,7 +237,7 @@ async def revoke_api_key(db: Session, key_id: str, user_id: str) -> bool:
     return True
 
 
-async def verify_api_key_service(db: Session, api_key: str) -> Optional[str]:
+def verify_api_key_service(db: Session, api_key: str) -> Optional[str]:
     """
     Verify an API key and return the user ID if valid
     

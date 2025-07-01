@@ -197,4 +197,28 @@ class PythonParser(BaseParser):
             return fixed_code
         except SyntaxError:
             # If the fixed code has syntax errors, add a comment
-            return fixed_code + "\n\n# Note: The fixed code may still contain syntax errors" 
+            return fixed_code + "\n\n# Note: The fixed code may still contain syntax errors"
+
+    def get_syntax_issues(self, parsed_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Extract Python-specific syntax issues from parsed data
+        
+        Args:
+            parsed_data: Dictionary with parsed information from parse() method
+            
+        Returns:
+            List of syntax issues found in the Python code
+        """
+        issues = []
+        
+        # Check if there's a syntax error in the parsed data
+        if "error" in parsed_data:
+            error = parsed_data["error"]
+            issues.append({
+                "message": error.get("message", "Python syntax error"),
+                "line": error.get("line", 1),
+                "column": error.get("column", 1),
+                "type": error.get("type", "SyntaxError")
+            })
+        
+        return issues 

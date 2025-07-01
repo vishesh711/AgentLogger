@@ -10,7 +10,13 @@ router = APIRouter()
 
 def get_user_id_from_request(request: Request) -> str:
     """Get the user ID from the request state"""
-    return request.state.user_id
+    user_id = getattr(request.state, 'user_id', None)
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User ID not found in request. API key authentication failed."
+        )
+    return user_id
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user(

@@ -100,8 +100,8 @@ class AgentSystem:
                 if recipient_id in self.agents:
                     # Send the message to the specific agent
                     await self.agents[recipient_id].receive_message(message)
-                elif recipient_id == "user":
-                    # This is a message for the user
+                elif recipient_id == "user" or not recipient_id.endswith("_1"):
+                    # This is a message for the user (either explicit "user" or any non-agent ID)
                     await self.handle_user_message(message)
                 else:
                     self.logger.warning(f"Message for unknown recipient: {recipient_id}")

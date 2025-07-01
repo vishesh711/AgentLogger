@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend-Backend Connection Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        button { padding: 10px 20px; margin: 10px 0; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>AgentLogger Frontend-Backend Connection Test</h1>
+    
+    <button onclick="testHealth()">Test Health Endpoint</button>
+    <button onclick="testAnalyze()">Test Analyze Endpoint</button>
+    <button onclick="testAuth()">Test Authentication</button>
+    
+    <div id="results"></div>
+
+    <script>
+        const API_KEY = 'QwF6KA863mAeRHOCY9HJJEccV9Gp0chKTL5pogRjeOU';
+        const API_BASE = '/api/v1';
+
+        function addResult(message, isSuccess) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${isSuccess ? 'success' : 'error'}`;
+            resultDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        async function testHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(`✅ Health check successful: ${data.status}`, true);
+                } else {
+                    addResult(`❌ Health check failed: ${response.status} ${response.statusText}`, false);
+                }
+            } catch (error) {
+                addResult(`❌ Health check error: ${error.message}`, false);
+            }
+        }
+
+        async function testAnalyze() {
+            try {
+                const response = await fetch(`${API_BASE}/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': API_KEY
+                    },
+                    body: JSON.stringify({
+                        code: 'print("Hello, world!")',
+                        language: 'python'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Analyze endpoint successful: Created analysis ${data.id}`, true);
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    addResult(`❌ Analyze failed: ${response.status} - ${errorData.detail || response.statusText}`, false);
+                }
+            } catch (error) {
+                addResult(`❌ Analyze error: ${error.message}`, false);
+            }
+        }
+
+        async function testAuth() {
+            try {
+                // Test without API key
+                const response1 = await fetch(`${API_BASE}/analyze`);
+                if (response1.status === 401) {
+                    addResult(`✅ Authentication working: Correctly rejected request without API key`, true);
+                } else {
+                    addResult(`❌ Authentication issue: Should have rejected request without API key`, false);
+                }
+
+                // Test with invalid API key
+                const response2 = await fetch(`${API_BASE}/analyze`, {
+                    headers: { 'X-API-Key': 'invalid-key' }
+                });
+                if (response2.status === 401) {
+                    addResult(`✅ Authentication working: Correctly rejected invalid API key`, true);
+                } else {
+                    addResult(`❌ Authentication issue: Should have rejected invalid API key`, false);
+                }
+
+            } catch (error) {
+                addResult(`❌ Auth test error: ${error.message}`, false);
+            }
+        }
+
+        // Run basic health test on page load
+        window.onload = () => {
+            addResult('🔄 Testing frontend-backend connection...', true);
+            testHealth();
+        };
+    </script>
+</body>
+</html> 

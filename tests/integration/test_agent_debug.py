@@ -1,11 +1,12 @@
 """
 Test script for the agent-based debugging system.
 """
-import asyncio
 import json
 import requests
 import time
 from typing import Dict, Any
+import pytest
+import os
 
 # API URL
 API_URL = "http://localhost:8000/api/v1"
@@ -25,53 +26,49 @@ if __name__ == "__main__":
     main()
 """
 
-async def test_agent_debug():
+def test_agent_debug():
     """Test the agent-based debugging system."""
-    print("Starting agent system...")
-    response = requests.post(f"{API_URL}/agent/start")
-    print(f"Response: {response.status_code} - {response.json()}")
+    # Skip if running in CI without actual server
+    if os.getenv("ENVIRONMENT") == "testing":
+        pytest.skip("Skipping integration test in CI environment")
+    
+    print("Starting agent system test...")
+    
+    # Test health endpoint first
+    try:
+        response = requests.get(f"{API_URL}/health/health", timeout=5)
+        if response.status_code != 200:
+            pytest.skip("Backend server not available for integration testing")
+    except requests.RequestException:
+        pytest.skip("Backend server not available for integration testing")
     
     print("\nSubmitting code for debugging...")
-    response = requests.post(
-        f"{API_URL}/agent/agent-debug",
-        json={
-            "code": BUGGY_CODE,
-            "language": "python",
-            "error_message": "ZeroDivisionError: division by zero"
-        }
-    )
     
-    if response.status_code != 200:
-        print(f"Error: {response.status_code} - {response.json()}")
-        return
-    
-    data = response.json()
-    session_id = data["session_id"]
-    print(f"Session ID: {session_id}")
-    
-    print("\nChecking status...")
-    max_attempts = 30
-    for i in range(max_attempts):
-        response = requests.get(f"{API_URL}/agent/agent-debug/{session_id}")
+    # Test the agent debug endpoint
+    try:
+        response = requests.post(
+            f"{API_URL}/agent-debug/test-full-workflow",
+            json={
+                "code": BUGGY_CODE,
+                "language": "python"
+            },
+            headers={
+                "X-API-Key": "QwF6KA863mAeRHOCY9HJJEccV9Gp0chKTL5pogRjeOU"
+            },
+            timeout=30
+        )
         
-        if response.status_code != 200:
-            print(f"Error: {response.status_code} - {response.json()}")
-            break
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
         
         data = response.json()
-        status = data["status"]
-        print(f"Status: {status}")
+        assert "workflow_result" in data or "result" in data, "Expected workflow result in response"
         
-        if status == "completed":
-            print("\nDebugging completed!")
-            print(json.dumps(data, indent=2))
-            break
+        print(f"Agent debug test completed successfully: {data}")
         
-        time.sleep(2)
-    
-    print("\nStopping agent system...")
-    response = requests.post(f"{API_URL}/agent/stop")
-    print(f"Response: {response.status_code} - {response.json()}")
+    except requests.RequestException as e:
+        pytest.fail(f"Request failed: {e}")
+    except Exception as e:
+        pytest.fail(f"Test failed: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(test_agent_debug()) 
+    test_agent_debug() 
