@@ -19,26 +19,23 @@ def test_invalid_api_key():
     )
     assert response.status_code == 401
 
-def test_public_endpoints():
+def test_public_endpoints(client):
     """Test that public endpoints don't require API key"""
     # Test health endpoint (correct path)
-    response = client.get("/api/v1/health/health")
+    response = client.get("/api/v1/health/")
     assert response.status_code == 200
     
     # Test docs endpoints
     response = client.get("/docs")
     assert response.status_code == 200
 
-def test_valid_api_key():
-    """Test that middleware handles API key validation properly"""
-    # In a test environment, we don't have real API keys in the database
-    # So we expect authentication to still fail (401), but this tests that
-    # the middleware is properly checking for authentication
+def test_valid_api_key(client, test_api_key):
+    """Test that valid API keys are accepted"""
     response = client.post(
         "/api/v1/analyze",
         json={"code": "print('hello')", "language": "python"},
-        headers={"X-API-Key": "test-api-key-that-would-be-valid-in-real-env"}
+        headers={"X-API-Key": test_api_key.key}
     )
-    # Should return 401 because API key doesn't exist in test DB
-    # This confirms authentication middleware is working correctly
-    assert response.status_code == 401 
+    # With a valid API key, we should get past authentication
+    # But might still fail with other errors (not 401)
+    assert response.status_code != 401 

@@ -1,83 +1,103 @@
 import os
-import uuid
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy_utils import database_exists, create_database
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, Column, String, Boolean, Text, ForeignKey, DateTime, func
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.pool import StaticPool
 
-from app.core.db import get_db
 from app.main import app
+from app.core.db import Base, get_db
+from app.models.db import user, api_key, analysis, fix, github
 
-# Create a test-specific Base
-TestBase = declarative_base()
-
-# Define simplified test models
-class User(TestBase):
-    __tablename__ = "users"
-    
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    full_name = Column(String)
-    is_active = Column(Boolean, default=True, nullable=False)
-    is_superuser = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-
-class ApiKey(TestBase):
-    __tablename__ = "api_keys"
-    
-    key = Column(String, primary_key=True)
-    name = Column(String)
-    description = Column(Text)
-    is_active = Column(Boolean, default=True, nullable=False)
-    user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, onupdate=func.now())
-
-# Use an in-memory SQLite database for testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
-
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
+# Test database URL - use in-memory SQLite for tests
+TEST_DATABASE_URL = os.environ.get(
+    "DATABASE_URL", "sqlite:///./test_agentlogger.db"
 )
 
+# Create test engine
+engine = create_engine(TEST_DATABASE_URL)
+
+# Create test session
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-
-@pytest.fixture(scope="function")
-def db():
-    # Create the database with test models
-    TestBase.metadata.create_all(bind=engine)
+@pytest.fixture(scope="session")
+def setup_database():
+    """Set up the test database"""
+    # Create database if it doesn't exist
+    if not database_exists(engine.url) and not TEST_DATABASE_URL.startswith("sqlite"):
+        create_database(engine.url)
     
-    # Create a session
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    # Create all tables
+    Base.metadata.create_all(bind=engine)
     
-    # Drop the database after the test
-    TestBase.metadata.drop_all(bind=engine)
+    # Return the engine
+    yield engine
+    
+    # Clean up (for SQLite in-memory)
+    if TEST_DATABASE_URL.startswith("sqlite"):
+        Base.metadata.drop_all(bind=engine)
 
+@pytest.fixture
+def db_session(setup_database):
+    """Create a fresh database session for each test"""
+    connection = setup_database.connect()
+    transaction = connection.begin()
+    session = TestingSessionLocal(bind=connection)
+    
+    yield session
+    
+    session.close()
+    transaction.rollback()
+    connection.close()
 
-@pytest.fixture(scope="function")
-def client(db):
-    # Override the get_db dependency to use the test database
+@pytest.fixture
+def client(db_session):
+    """Create a test client with a database session"""
     def override_get_db():
         try:
-            yield db
+            yield db_session
         finally:
             pass
     
     app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as test_client:
+        yield test_client
     
-    # Create a test client
-    with TestClient(app) as c:
-        yield c
+    app.dependency_overrides.clear()
+
+@pytest.fixture
+def test_user(db_session):
+    """Create a test user"""
+    from app.models.db.user import User
+    from app.services.user_service import get_password_hash
     
-    # Reset the dependency override
-    app.dependency_overrides = {} 
+    test_user = User(
+        email="test@example.com",
+        hashed_password=get_password_hash("testpassword"),
+        is_active=True,
+        is_superuser=False,
+        full_name="Test User"
+    )
+    db_session.add(test_user)
+    db_session.commit()
+    db_session.refresh(test_user)
+    
+    return test_user
+
+@pytest.fixture
+def test_api_key(db_session, test_user):
+    """Create a test API key"""
+    from app.models.db.api_key import APIKey
+    import secrets
+    
+    api_key = APIKey(
+        key="test-api-key-for-testing",
+        name="Test API Key",
+        user_id=test_user.id,
+        is_active=True
+    )
+    db_session.add(api_key)
+    db_session.commit()
+    db_session.refresh(api_key)
+    
+    return api_key
