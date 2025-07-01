@@ -1,31 +1,35 @@
 {
   "version": 2,
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/app/main.py"
+      "src": "/api/(.*)",
+      "dest": "/app/main.py"
     },
     {
-      "source": "/(.*)",
-      "destination": "/frontend/$1"
+      "src": "/(.*)",
+      "dest": "/frontend/$1"
     }
   ],
   "env": {
     "ENVIRONMENT": "production",
-    "API_V1_STR": "/api/v1",
-    "DATABASE_URL": "@database_url",
-    "GROQ_API_KEY": "@groq_api_key",
-    "SECRET_KEY": "@secret_key",
-    "CORS_ORIGINS": "[\"https://agentlogger.vercel.app\"]"
+    "API_V1_STR": "/api/v1"
   },
   "build": {
     "env": {
       "PYTHON_VERSION": "3.11"
     }
   },
-  "functions": {
-    "app/main.py": {
-      "maxDuration": 30
+  "builds": [
+    {
+      "src": "app/main.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     }
-  }
+  ]
 } 
