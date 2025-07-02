@@ -39,3 +39,4 @@ pygithub>=2.1.1
 
 # Monitoring
 sentry-sdk>=1.35.0
+sqlalchemy_utils>=0.41.1
