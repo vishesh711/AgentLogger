@@ -28,9 +28,6 @@ if settings.SENTRY_DSN:
         environment=settings.SENTRY_ENVIRONMENT,
         traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
         
-        # Set a name for this service
-        service_name=settings.PROJECT_NAME,
-        
         # Enable performance monitoring
         enable_tracing=True,
     )
@@ -164,6 +161,7 @@ def custom_openapi():
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
+# Set the custom openapi function
 app.openapi = custom_openapi
 
 if __name__ == "__main__":

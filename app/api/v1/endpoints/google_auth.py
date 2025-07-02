@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from urllib.parse import urlencode
 from uuid import uuid4
 from datetime import timedelta
+from typing import Optional
 
 from app.core.config import settings
 from app.core.db import get_db
@@ -41,7 +42,7 @@ async def google_authorize():
 @router.get("/callback")
 async def google_callback(
     code: str,
-    state: str = None,
+    state: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """Handle Google OAuth callback"""

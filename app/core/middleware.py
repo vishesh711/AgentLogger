@@ -1,31 +1,32 @@
 import time
-from collections import defaultdict
-from typing import Callable, Dict, Tuple, Any, Optional
-
-from fastapi import HTTPException, Request, Response, FastAPI, status, Depends
-from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_429_TOO_MANY_REQUESTS
-from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 import jwt
+from typing import Dict, Callable, Any
+from collections import defaultdict
+
+from fastapi import FastAPI, Request, Response, status
+from fastapi.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware as StarletteBaseMiddleware
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.db import get_db, SessionLocal
-from app.services.api_key_service import verify_api_key_service, validate_api_key
+from app.core.db import SessionLocal
+from app.services.api_key_service import validate_api_key
 from app.services.monitoring_service import monitoring_service
 
-# Simple in-memory rate limiter
+
 class RateLimiter:
     def __init__(self):
         self.requests: Dict[str, list] = defaultdict(list)
-        self.window_size = 60  # 1 minute window
+        self.window_size = 60  # 1 minute window in seconds
     
     def is_rate_limited(self, key: str) -> bool:
         """
-        Check if a key is rate limited based on requests in the last minute
+        Check if a given key has exceeded the rate limit
         """
         current_time = time.time()
         
-        # Remove requests older than the window
+        # Remove old requests outside the time window
         self.requests[key] = [
             req_time for req_time in self.requests[key]
             if current_time - req_time < self.window_size
@@ -55,7 +56,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Get client identifier (API key or IP)
-        client_id = request.headers.get("X-API-Key") or request.client.host
+        client_host = request.client.host if request.client else "unknown"
+        client_id = request.headers.get("X-API-Key") or client_host
         
         # Skip rate limiting for certain paths
         if request.url.path in ["/api/v1/health", "/api/v1/health/health", "/docs", "/redoc", "/openapi.json"]:
@@ -208,15 +210,15 @@ def add_middlewares(app: FastAPI) -> None:
     """
     Add middlewares to the FastAPI app
     """
-    # Add API key middleware
-    app.add_middleware(APIKeyMiddleware)
-    
     # Add analytics middleware
     app.add_middleware(AnalyticsMiddleware)
     
     # Add rate limiting middleware
     if settings.RATE_LIMIT_PER_MINUTE > 0:
         app.add_middleware(RateLimitMiddleware)
+    
+    # Add API key middleware
+    app.add_middleware(APIKeyMiddleware)
     
     # Add timing middleware for debugging
     @app.middleware("http")

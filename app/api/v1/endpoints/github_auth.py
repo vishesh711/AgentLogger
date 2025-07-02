@@ -2,6 +2,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from urllib.parse import urlencode
+from typing import Optional
 
 from app.core.config import settings
 from app.core.db import get_db
@@ -30,7 +31,7 @@ async def github_authorize():
 @router.get("/callback")
 async def github_callback(
     code: str,
-    state: str = None,
+    state: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """Handle GitHub OAuth callback"""

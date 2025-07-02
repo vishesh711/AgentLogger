@@ -1,5 +1,4 @@
 from typing import List
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -42,7 +41,7 @@ async def create_new_api_key(
 
 @router.get("/{api_key_id}", response_model=ApiKeyResponse)
 async def get_api_key_by_id(
-    api_key_id: UUID,
+    api_key_id: str,
     request: Request,
     db: Session = Depends(get_db),
 ):
@@ -96,7 +95,7 @@ async def get_user_api_keys(
 
 @router.put("/{api_key_id}", response_model=ApiKeyResponse)
 async def update_api_key_data(
-    api_key_id: UUID,
+    api_key_id: str,
     api_key_data: ApiKeyUpdate,
     request: Request,
     db: Session = Depends(get_db),
@@ -138,7 +137,7 @@ async def update_api_key_data(
 
 @router.delete("/{api_key_id}")
 async def delete_api_key_by_id(
-    api_key_id: UUID,
+    api_key_id: str,
     request: Request,
     db: Session = Depends(get_db),
 ):

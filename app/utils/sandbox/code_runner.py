@@ -10,7 +10,7 @@ class CodeRunner:
     """
     Class for running code in a sandbox environment
     """
-    def __init__(self, use_docker: bool = None):
+    def __init__(self, use_docker: Optional[bool] = None):
         """
         Initialize the CodeRunner
         

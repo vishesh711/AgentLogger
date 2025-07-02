@@ -32,5 +32,5 @@ class User(BaseModel):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<User(id='{self.id}', email='{self.email}')>" 

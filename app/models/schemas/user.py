@@ -1,6 +1,5 @@
 from datetime import datetime
 from typing import List, Optional
-from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -33,7 +32,7 @@ class UserUpdate(BaseModel):
 
 # Schema for returning a user
 class UserResponse(UserBase):
-    id: UUID
+    id: str
     is_superuser: bool
     github_username: Optional[str] = None
     created_at: datetime

@@ -35,5 +35,5 @@ class GitHubPR(BaseModel):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<GitHubPR(id='{self.id}', repo='{self.repo_name}', pr_number={self.pr_number})>" 

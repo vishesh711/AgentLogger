@@ -11,7 +11,7 @@ from app.models.schemas.api_key import ApiKeyCreate, ApiKeyResponse, ApiKeyUpdat
 from app.core.db import get_db
 
 
-async def validate_api_key(api_key: str, db: Session = None) -> Optional[str]:
+async def validate_api_key(api_key: str, db: Optional[Session] = None) -> Optional[str]:
     """
     Validate an API key and return the user ID if valid
     
@@ -89,7 +89,7 @@ def create_api_key(
     }
 
 
-def get_api_key(db: Session, api_key_id: UUID) -> Optional[ApiKey]:
+def get_api_key(db: Session, api_key_id: str) -> Optional[ApiKey]:
     """
     Get an API key by ID
     """
@@ -103,7 +103,7 @@ def get_api_key_by_key(db: Session, key: str) -> Optional[ApiKey]:
     return db.query(ApiKey).filter(ApiKey.key == key).first()
 
 
-def get_api_keys(db: Session, user_id: str) -> list[ApiKeyResponse]:
+def get_api_keys(db: Session, user_id: str) -> List[ApiKeyResponse]:
     """
     Get all API keys for a user
     
@@ -119,7 +119,7 @@ def get_api_keys(db: Session, user_id: str) -> list[ApiKeyResponse]:
     return [
         ApiKeyResponse(
             id=key.id,
-            name=key.name,
+            name=key.name or "",  # Ensure name is never None
             description=key.description,
             is_active=key.is_active,
             created_at=key.created_at,
@@ -130,7 +130,7 @@ def get_api_keys(db: Session, user_id: str) -> list[ApiKeyResponse]:
     ]
 
 
-def get_api_keys_by_user(db: Session, user_id: Union[UUID, str]) -> List[ApiKeyResponse]:
+def get_api_keys_by_user(db: Session, user_id: str) -> List[ApiKeyResponse]:
     """
     Get all API keys for a user by user ID
     
@@ -141,15 +141,15 @@ def get_api_keys_by_user(db: Session, user_id: Union[UUID, str]) -> List[ApiKeyR
     Returns:
         List of API key responses
     """
-    # Convert UUID to string if necessary for database query
-    user_id_str = str(user_id) if isinstance(user_id, UUID) else user_id
+    # Convert to string if necessary for database query
+    user_id_str = str(user_id)
     
     db_api_keys = db.query(ApiKey).filter(ApiKey.user_id == user_id_str).all()
     
     return [
         ApiKeyResponse(
             id=key.id,
-            name=key.name,
+            name=key.name or "",  # Ensure name is never None
             description=key.description,
             is_active=key.is_active,
             created_at=key.created_at,
@@ -160,7 +160,7 @@ def get_api_keys_by_user(db: Session, user_id: Union[UUID, str]) -> List[ApiKeyR
     ]
 
 
-def update_api_key(db: Session, api_key_id: UUID, api_key_data: ApiKeyUpdate) -> Optional[ApiKey]:
+def update_api_key(db: Session, api_key_id: str, api_key_data: ApiKeyUpdate) -> Optional[ApiKey]:
     """
     Update an API key
     
@@ -177,13 +177,13 @@ def update_api_key(db: Session, api_key_id: UUID, api_key_data: ApiKeyUpdate) ->
         return None
     
     # Update fields if provided
-    if api_key_data.name is not None:
+    if hasattr(api_key_data, 'name') and api_key_data.name is not None:
         db_api_key.name = api_key_data.name
-    if api_key_data.description is not None:
+    if hasattr(api_key_data, 'description') and api_key_data.description is not None:
         db_api_key.description = api_key_data.description
-    if api_key_data.is_active is not None:
+    if hasattr(api_key_data, 'is_active') and api_key_data.is_active is not None:
         db_api_key.is_active = api_key_data.is_active
-    if api_key_data.expires_in_days is not None:
+    if hasattr(api_key_data, 'expires_in_days') and api_key_data.expires_in_days is not None:
         db_api_key.expires_at = datetime.utcnow() + timedelta(days=api_key_data.expires_in_days)
     
     db.commit()
@@ -191,7 +191,7 @@ def update_api_key(db: Session, api_key_id: UUID, api_key_data: ApiKeyUpdate) ->
     return db_api_key
 
 
-def delete_api_key(db: Session, api_key_id: UUID) -> bool:
+def delete_api_key(db: Session, api_key_id: str) -> bool:
     """
     Delete an API key
     
@@ -231,7 +231,8 @@ def revoke_api_key(db: Session, key_id: str, user_id: str) -> bool:
     if not db_api_key:
         return False
     
-    db_api_key.is_active = False
+    # MyPy might think this is assigning to Column, but it's actually setting the attribute value
+    db_api_key.is_active = False  # type: ignore
     db.commit()
     
     return True
@@ -260,8 +261,8 @@ def verify_api_key_service(db: Session, api_key: str) -> Optional[str]:
     if db_api_key.expires_at and db_api_key.expires_at < datetime.utcnow():
         return None
     
-    # Update last used timestamp
-    db_api_key.last_used_at = datetime.utcnow()
+    # Update last used timestamp - MyPy might think this is Column assignment, but it's setting the value
+    db_api_key.last_used_at = datetime.utcnow()  # type: ignore
     db.commit()
     
-    return db_api_key.user_id 
+    return str(db_api_key.user_id) 

@@ -1,7 +1,6 @@
 import enum
 
 from sqlalchemy import Column, Enum, ForeignKey, JSON, String, Text, Boolean, DateTime
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -47,5 +46,5 @@ class AnalysisRequest(BaseModel):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<AnalysisRequest(id='{self.id}', user_id='{self.user_id}', status='{self.status}')>" 

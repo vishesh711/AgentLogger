@@ -21,14 +21,18 @@ class ApiKeyCreate(ApiKeyBase):
 # Schema for updating an API key
 class ApiKeyUpdate(BaseModel):
     name: Optional[str] = None
+    description: Optional[str] = None
     is_active: Optional[bool] = None
     expires_at: Optional[datetime] = None
+    expires_in_days: Optional[int] = None
 
 
 # Schema for returning an API key
-class ApiKeyResponse(ApiKeyBase):
+class ApiKeyResponse(BaseModel):
     """Schema for API key response"""
     id: str = Field(..., description="Unique identifier for the API key")
+    name: str = Field(..., description="Name of the API key")
+    description: Optional[str] = Field(None, description="Description of the API key")
     is_active: bool = Field(..., description="Whether the API key is active")
     created_at: datetime = Field(..., description="When the API key was created")
     expires_at: Optional[datetime] = Field(None, description="When the API key expires")
@@ -40,7 +44,7 @@ class ApiKeyResponse(ApiKeyBase):
 # Schema for API key creation response
 class ApiKeyCreateResponse(BaseModel):
     key: str = Field(..., description="The API key (only shown once)")
-    id: UUID
+    id: str = Field(..., description="Unique identifier for the API key")
     name: Optional[str] = None
     expires_at: Optional[datetime] = None
     created_at: datetime 

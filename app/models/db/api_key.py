@@ -1,12 +1,15 @@
 import secrets
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, ForeignKey, String, DateTime, Text
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.models.db.base import BaseModel
+
+if TYPE_CHECKING:
+    from app.models.db.user import User
 
 
 class ApiKey(BaseModel):
@@ -21,8 +24,8 @@ class ApiKey(BaseModel):
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     
-    # Foreign keys
-    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False)
+    # Foreign keys - Changed from UUID to String to match users.id type
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
     
     # Relationships
     user = relationship("User", back_populates="api_keys")
@@ -31,7 +34,7 @@ class ApiKey(BaseModel):
     expires_at = Column(DateTime(timezone=True), nullable=True)
     last_used_at = Column(DateTime(timezone=True), nullable=True)
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<ApiKey(id='{self.id}', user_id='{self.user_id}')>"
     
     @property

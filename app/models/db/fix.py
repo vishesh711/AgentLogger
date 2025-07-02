@@ -1,7 +1,6 @@
 import enum
 
 from sqlalchemy import Column, Enum, ForeignKey, JSON, String, Text, Boolean, DateTime
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -26,8 +25,8 @@ class FixRequest(BaseModel):
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
     user = relationship("User", back_populates="fix_requests")
     
-    # Related analysis request
-    analysis_id = Column(UUID(as_uuid=True), ForeignKey("analysis_requests.id"), nullable=True)
+    # Related analysis request - Changed from UUID to String for compatibility
+    analysis_id = Column(String, ForeignKey("analysis_requests.id"), nullable=True)
     analysis = relationship("AnalysisRequest", back_populates="fix_requests")
     
     # Code to fix
@@ -39,7 +38,7 @@ class FixRequest(BaseModel):
     # Fix result
     fixed_code = Column(Text, nullable=True)
     explanation = Column(Text, nullable=True)
-    status = Column(Enum(FixStatus), nullable=False, default=FixStatus.PENDING)
+    status: FixStatus = Column(Enum(FixStatus), nullable=False, default=FixStatus.PENDING)
     validation_message = Column(Text, nullable=True)
     
     # Agent system tracking
@@ -53,5 +52,5 @@ class FixRequest(BaseModel):
     # GitHub PR info
     github_prs = relationship("GitHubPR", back_populates="fix_request", cascade="all, delete-orphan")
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<FixRequest(id='{self.id}', user_id='{self.user_id}', status='{self.status}')>" 

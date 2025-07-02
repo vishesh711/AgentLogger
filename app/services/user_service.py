@@ -13,7 +13,7 @@ async def create_user(db: Session, user_data: UserCreate) -> User:
     """
     db_user = User(
         email=user_data.email,
-        name=user_data.name,
+        full_name=user_data.full_name,
         is_active=user_data.is_active,
     )
     db.add(db_user)
@@ -22,7 +22,7 @@ async def create_user(db: Session, user_data: UserCreate) -> User:
     return db_user
 
 
-async def get_user(db: Session, user_id: UUID) -> Optional[User]:
+async def get_user(db: Session, user_id: str) -> Optional[User]:
     """
     Get a user by ID
     """
@@ -43,7 +43,7 @@ async def get_users(db: Session, skip: int = 0, limit: int = 100) -> List[User]:
     return db.query(User).offset(skip).limit(limit).all()
 
 
-async def update_user(db: Session, user_id: UUID, user_data: UserUpdate) -> Optional[User]:
+async def update_user(db: Session, user_id: str, user_data: UserUpdate) -> Optional[User]:
     """
     Update a user
     """
@@ -51,7 +51,7 @@ async def update_user(db: Session, user_id: UUID, user_data: UserUpdate) -> Opti
     if not db_user:
         return None
     
-    update_data = user_data.dict(exclude_unset=True)
+    update_data = user_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_user, field, value)
     
@@ -60,7 +60,7 @@ async def update_user(db: Session, user_id: UUID, user_data: UserUpdate) -> Opti
     return db_user
 
 
-async def delete_user(db: Session, user_id: UUID) -> bool:
+async def delete_user(db: Session, user_id: str) -> bool:
     """
     Delete a user
     """

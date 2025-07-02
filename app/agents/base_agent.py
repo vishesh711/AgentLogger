@@ -6,7 +6,7 @@ import asyncio
 import json
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Callable
 
 class Message:
     """
@@ -63,9 +63,9 @@ class BaseAgent(ABC):
     def __init__(self, agent_id: str, agent_type: str):
         self.agent_id = agent_id
         self.agent_type = agent_type
-        self.memory = {}
-        self.message_queue = asyncio.Queue()
-        self.tools = {}
+        self.memory: Dict[str, Any] = {}
+        self.message_queue: asyncio.Queue[Message] = asyncio.Queue()
+        self.tools: Dict[str, Callable] = {}
         self.logger = None  # Will be set up by the agent system
     
     async def start(self):
@@ -118,11 +118,11 @@ class BaseAgent(ABC):
             else:
                 self.logger.info(f"[{self.agent_id}] {message}")
     
-    def register_tool(self, tool_name: str, tool_function):
+    def register_tool(self, tool_name: str, tool_function: Callable):
         """Register a tool that the agent can use."""
         self.tools[tool_name] = tool_function
     
-    async def use_tool(self, tool_name: str, **kwargs):
+    async def use_tool(self, tool_name: str, **kwargs) -> Any:
         """Use a registered tool."""
         if tool_name not in self.tools:
             raise ValueError(f"Tool {tool_name} not registered")
