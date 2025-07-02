@@ -9,7 +9,7 @@ client = TestClient(app)
 
 def test_health_endpoint():
     """Test that the health endpoint returns a successful response"""
-    response = client.get("/api/v1/health/health")
+    response = client.get("/api/v1/health/")
     assert response.status_code == 200
     
     data = response.json()
@@ -22,7 +22,7 @@ def test_health_endpoint_timestamp_format():
     """
     Test that the health endpoint returns a timestamp in ISO format
     """
-    response = client.get("/api/v1/health/health")
+    response = client.get("/api/v1/health/")
     assert response.status_code == 200
     
     data = response.json()
@@ -39,7 +39,7 @@ def test_health_endpoint_version_format():
     """
     Test that the health endpoint returns a version in semantic versioning format
     """
-    response = client.get("/api/v1/health/health")
+    response = client.get("/api/v1/health/")
     assert response.status_code == 200
     
     data = response.json()
