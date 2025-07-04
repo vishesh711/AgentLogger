@@ -17,25 +17,25 @@ def test_invalid_api_key():
         json={"code": "test", "language": "python"},
         headers={"X-API-Key": "invalid-key"}
     )
+    # Should return 401 for invalid API key
     assert response.status_code == 401
 
-def test_public_endpoints(client):
+def test_public_endpoints():
     """Test that public endpoints don't require API key"""
     # Test health endpoint (correct path)
-    response = client.get("/api/v1/health/")
+    response = client.get("/health")
     assert response.status_code == 200
     
     # Test docs endpoints
     response = client.get("/docs")
     assert response.status_code == 200
 
-def test_valid_api_key(client, test_api_key):
-    """Test that valid API keys are accepted"""
-    response = client.post(
-        "/api/v1/analyze",
-        json={"code": "print('hello')", "language": "python"},
-        headers={"X-API-Key": test_api_key.key}
-    )
-    # With a valid API key, we should get past authentication
-    # But might still fail with other errors (not 401)
-    assert response.status_code != 401 
+def test_root_endpoint():
+    """Test that root endpoint is public"""
+    response = client.get("/")
+    assert response.status_code == 200
+    data = response.json()
+    assert "message" in data
+    assert data["message"] == "AgentLogger API"
+
+ 

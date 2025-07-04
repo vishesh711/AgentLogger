@@ -78,7 +78,7 @@ jobs:
     
     - name: Test Docker build
       run: |
-        docker build -t agentlogger-test .
+        docker build -t agentlogger-test -f deployment/Dockerfile .
         docker run --rm agentlogger-test python -c "import app; print('Backend import successful')"
 
   build:
@@ -102,7 +102,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ./Dockerfile.prod
+        file: ./deployment/Dockerfile.prod
         push: true
         tags: agentlogger/api:latest,agentlogger/api:${{ github.sha }}
         cache-from: type=registry,ref=agentlogger/api:buildcache
@@ -122,6 +122,6 @@ jobs:
         key: ${{ secrets.DEPLOY_KEY }}
         script: |
           cd /opt/agentlogger
-          docker-compose -f docker-compose.prod.yml pull
-          docker-compose -f docker-compose.prod.yml up -d
+          docker-compose -f deployment/docker-compose.prod.yml pull
+          docker-compose -f deployment/docker-compose.prod.yml up -d
           docker system prune -af 

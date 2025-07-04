@@ -54,7 +54,7 @@ RUN chmod +x /app/entrypoint.sh
 
 # Create a healthcheck script
 RUN echo '#!/bin/bash\n\
-curl -f http://localhost:8000/api/v1/health || exit 1\n\
+curl -f http://localhost:8000/health || exit 1\n\
 ' > /app/healthcheck.sh && chmod +x /app/healthcheck.sh
 
 # Add healthcheck

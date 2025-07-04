@@ -7,7 +7,7 @@ from pydantic.fields import FieldInfo
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True)
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="ignore")
     
     # Project info
     PROJECT_NAME: str = "AgentLogger API"
@@ -39,7 +39,17 @@ class Settings(BaseSettings):
             ]
         if isinstance(v, str):
             # Handle comma-separated string
-            return [i.strip() for i in v.split(",") if i.strip()]
+            try:
+                return [i.strip() for i in v.split(",") if i.strip()]
+            except Exception:
+                # Fallback to default if parsing fails
+                return [
+                    "http://localhost",
+                    "http://localhost:80", 
+                    "http://localhost:3000",
+                    "http://localhost:5173",
+                    "http://localhost:8080"
+                ]
         elif isinstance(v, list):
             return v
         return [

@@ -59,7 +59,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         client_id = request.headers.get("X-API-Key") or client_host
         
         # Skip rate limiting for certain paths
-        if request.url.path in ["/api/v1/health", "/api/v1/health/health", "/docs", "/redoc", "/openapi.json"]:
+        if request.url.path in ["/health", "/api/v1/health", "/api/v1/health/health", "/docs", "/redoc", "/openapi.json"]:
             return await call_next(request)
         
         # Check rate limit
@@ -102,6 +102,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             "/api/v1/docs",
             "/api/v1/redoc", 
             "/api/v1/openapi.json",
+            "/health",
             "/api/v1/health",
             "/api/v1/health/health",
             "/api/v1/auth/register",
