@@ -17,28 +17,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Drop the existing foreign key constraint
-    op.drop_constraint('api_keys_user_id_fkey', 'api_keys', type_='foreignkey')
-    
-    # Change the user_id column type from UUID to String
-    op.alter_column('api_keys', 'user_id',
-                   existing_type=postgresql.UUID(),
-                   type_=sa.String(),
-                   existing_nullable=False)
-    
-    # Recreate the foreign key constraint
-    op.create_foreign_key('api_keys_user_id_fkey', 'api_keys', 'users', ['user_id'], ['id'])
+    # This migration is no longer needed since both columns are now String
+    # The foreign key constraint should already work correctly
+    pass
 
 
 def downgrade() -> None:
-    # Drop the foreign key constraint
-    op.drop_constraint('api_keys_user_id_fkey', 'api_keys', type_='foreignkey')
-    
-    # Change the user_id column type back from String to UUID
-    op.alter_column('api_keys', 'user_id',
-                   existing_type=sa.String(),
-                   type_=postgresql.UUID(),
-                   existing_nullable=False)
-    
-    # Recreate the foreign key constraint
-    op.create_foreign_key('api_keys_user_id_fkey', 'api_keys', 'users', ['user_id'], ['id']) 
+    # This migration is no longer needed since both columns are now String
+    pass 
