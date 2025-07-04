@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     
     @field_validator("SQLALCHEMY_DATABASE_URI", mode="before")
     @classmethod
-    def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+    def assemble_db_connection(cls, v: Optional[str], info) -> Any:
         if isinstance(v, str):
             return v
             
@@ -70,12 +70,20 @@ class Settings(BaseSettings):
         if os.getenv("DATABASE_URL"):
             return os.getenv("DATABASE_URL")
             
+        # Get values from field info context
+        values = info.data if hasattr(info, 'data') else {}
+            
         # Use SQLite for development by default
         if values.get("ENVIRONMENT") == "development" and not os.getenv("USE_POSTGRES", "").lower() == "true":
             return "sqlite:///./agentlogger.db"
             
         # Build the PostgreSQL connection string
-        return f"postgresql://{values.get('POSTGRES_USER')}:{values.get('POSTGRES_PASSWORD')}@{values.get('POSTGRES_SERVER')}/{values.get('POSTGRES_DB')}"
+        postgres_server = values.get('POSTGRES_SERVER') or os.getenv("POSTGRES_SERVER", "db")
+        postgres_user = values.get('POSTGRES_USER') or os.getenv("POSTGRES_USER", "postgres")
+        postgres_password = values.get('POSTGRES_PASSWORD') or os.getenv("POSTGRES_PASSWORD", "postgres")
+        postgres_db = values.get('POSTGRES_DB') or os.getenv("POSTGRES_DB", "agentlogger")
+        
+        return f"postgresql://{postgres_user}:{postgres_password}@{postgres_server}/{postgres_db}"
     
     # Redis settings (optional)
     REDIS_HOST: Optional[str] = os.getenv("REDIS_HOST", "redis")

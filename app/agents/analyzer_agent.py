@@ -29,7 +29,9 @@ class AnalyzerAgent(BaseAgent):
         """Process incoming messages and analyze code."""
         self.log(f"Processing message: {message.message_type} from {message.sender_id}")
         
-        if message.message_type == "task" and message.content.get("step") == "analyze":
+        if message.message_type == "analyze_request":
+            return await self.analyze_code(message)
+        elif message.message_type == "task" and message.content.get("step") == "analyze":
             return await self.analyze_code(message)
         else:
             self.log(f"Ignoring message type: {message.message_type}", level="INFO")
@@ -46,46 +48,60 @@ class AnalyzerAgent(BaseAgent):
         
         issues = []
         
-        # Step 1: Static analysis using language-specific parser
-        static_issues = await self.perform_static_analysis(code, language)
-        issues.extend(static_issues)
+        try:
+            # Step 1: Static analysis using language-specific parser
+            static_issues = await self.perform_static_analysis(code, language)
+            issues.extend(static_issues)
+            
+            # Step 2: If there's an error message, analyze it
+            if error_message:
+                error_issues = await self.analyze_error_message(code, language, error_message)
+                issues.extend(error_issues)
+            
+            # Step 3: If we have a code runner, try to execute the code
+            if self.code_runner and not error_message:
+                runtime_issues = await self.execute_code(code, language)
+                issues.extend(runtime_issues)
+            
+            # Step 4: Use LLM to identify additional issues
+            llm_issues = await self.identify_issues_with_llm(code, language, error_message)
+            issues.extend(llm_issues)
+            
+            # Remove duplicates and assign IDs
+            unique_issues = []
+            seen_messages = set()
+            
+            for issue in issues:
+                if issue["message"] not in seen_messages:
+                    issue["id"] = str(uuid.uuid4())
+                    unique_issues.append(issue)
+                    seen_messages.add(issue["message"])
+            
+            # Sort issues by severity
+            severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+            unique_issues.sort(key=lambda x: severity_order.get(x.get("severity", "info"), 5))
+            
+        except Exception as e:
+            self.log(f"Error during analysis: {str(e)}", level="ERROR")
+            unique_issues = [{
+                "id": str(uuid.uuid4()),
+                "type": "analysis_error",
+                "message": f"Analysis failed: {str(e)}",
+                "line_start": 1,
+                "line_end": 1,
+                "severity": "critical",
+                "confidence": 0.9
+            }]
         
-        # Step 2: If there's an error message, analyze it
-        if error_message:
-            error_issues = await self.analyze_error_message(code, language, error_message)
-            issues.extend(error_issues)
-        
-        # Step 3: If we have a code runner, try to execute the code
-        if self.code_runner and not error_message:
-            runtime_issues = await self.execute_code(code, language)
-            issues.extend(runtime_issues)
-        
-        # Step 4: Use LLM to identify additional issues
-        llm_issues = await self.identify_issues_with_llm(code, language, error_message)
-        issues.extend(llm_issues)
-        
-        # Remove duplicates and assign IDs
-        unique_issues = []
-        seen_messages = set()
-        
-        for issue in issues:
-            if issue["message"] not in seen_messages:
-                issue["id"] = str(uuid.uuid4())
-                unique_issues.append(issue)
-                seen_messages.add(issue["message"])
-        
-        # Sort issues by severity
-        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
-        unique_issues.sort(key=lambda x: severity_order.get(x.get("severity", "info"), 5))
-        
-        # Create response message
+        # Create response message for coordinator
         response = Message(
-            message_type="agent_response",
+            message_type="analysis_result",
             sender_id=self.agent_id,
-            recipient_id=message.sender_id,
+            recipient_id=message.sender_id,  # Send back to coordinator
             content={
                 "session_id": session_id,
-                "issues": unique_issues
+                "issues": unique_issues,
+                "analysis_complete": True
             },
             parent_id=message.message_id
         )

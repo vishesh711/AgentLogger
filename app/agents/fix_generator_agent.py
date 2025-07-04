@@ -25,7 +25,9 @@ class FixGeneratorAgent(BaseAgent):
         """Process incoming messages and generate fixes."""
         self.log(f"Processing message: {message.message_type} from {message.sender_id}")
         
-        if message.message_type == "task" and message.content.get("step") == "fix":
+        if message.message_type == "fix_request":
+            return await self.generate_fixes(message)
+        elif message.message_type == "task" and message.content.get("step") == "fix":
             return await self.generate_fixes(message)
         else:
             self.log(f"Ignoring message type: {message.message_type}", level="INFO")
@@ -42,20 +44,35 @@ class FixGeneratorAgent(BaseAgent):
         
         fixes = []
         
-        # Process each issue and generate a fix
-        for issue in issues:
-            fix = await self.generate_fix_for_issue(code, language, issue)
-            if fix:
-                fixes.append(fix)
+        try:
+            # Process each issue and generate a fix
+            for issue in issues:
+                fix = await self.generate_fix_for_issue(code, language, issue)
+                if fix:
+                    fixes.append(fix)
+        except Exception as e:
+            self.log(f"Error generating fixes: {str(e)}", level="ERROR")
+            # Return error message to coordinator
+            return Message(
+                message_type="error",
+                sender_id=self.agent_id,
+                recipient_id=message.sender_id,
+                content={
+                    "session_id": session_id,
+                    "error": f"Fix generation failed: {str(e)}"
+                },
+                parent_id=message.message_id
+            )
         
-        # Create response message
+        # Create response message for coordinator
         response = Message(
-            message_type="agent_response",
+            message_type="fix_result",
             sender_id=self.agent_id,
-            recipient_id=message.sender_id,
+            recipient_id=message.sender_id,  # Send back to coordinator
             content={
                 "session_id": session_id,
-                "fixes": fixes
+                "fixes": fixes,
+                "fix_generation_complete": True
             },
             parent_id=message.message_id
         )

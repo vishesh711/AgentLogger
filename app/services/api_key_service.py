@@ -258,10 +258,20 @@ def verify_api_key_service(db: Session, api_key: str) -> Optional[str]:
         return None
     
     # Check if the key has expired
-    if db_api_key.expires_at and db_api_key.expires_at < datetime.utcnow():
-        return None
+    if db_api_key.expires_at:
+        from datetime import timezone
+        # Handle both timezone-aware and naive datetimes
+        current_time = datetime.now(timezone.utc)
+        expires_at = db_api_key.expires_at
+        
+        # If expires_at is naive, assume it's UTC
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        
+        if expires_at < current_time:
+            return None
     
-    # Update last used timestamp - MyPy might think this is Column assignment, but it's setting the value
+    # Update last used timestamp
     db_api_key.last_used_at = datetime.utcnow()  # type: ignore
     db.commit()
     

@@ -24,7 +24,7 @@ from app.core.dependencies import get_agent_system_dependency
 async def analyze_code_background(db: Session, analysis_id: UUID, agent_system: AgentSystem = None):
     """Background task to analyze code"""
     try:
-        if agent_system:
+        if agent_system and agent_system.running:
             await analyze_code_with_agents(db, analysis_id, agent_system)
         else:
             await analyze_code_direct(db, analysis_id)
@@ -43,7 +43,7 @@ async def create_analysis(
     """
     Create a new code analysis request
     
-    The analysis will run asynchronously in the background.
+    The analysis will run asynchronously in the background using the agent system.
     """
     # Get user_id from request state (set by the API key middleware)
     user_id = getattr(request.state, 'user_id', None)
@@ -56,7 +56,7 @@ async def create_analysis(
     # Create the analysis request
     analysis = await create_analysis_request(db, analysis_data, UUID(user_id))
     
-    # Run the analysis in the background
+    # Run the analysis in the background with agent system
     background_tasks.add_task(analyze_code_background, db, analysis.id, agent_system)
     
     return analysis
@@ -69,7 +69,7 @@ async def get_analysis(
     db: Session = Depends(get_db),
 ):
     """
-    Get a specific analysis request by ID
+    Get an analysis request by ID
     """
     # Get user_id from request state (set by the API key middleware)
     user_id = getattr(request.state, 'user_id', None)
@@ -99,8 +99,6 @@ async def get_analysis(
 @router.get("", response_model=List[AnalysisRequestResponse])
 async def get_user_analyses(
     request: Request,
-    skip: int = 0,
-    limit: int = 100,
     db: Session = Depends(get_db),
 ):
     """
@@ -114,7 +112,8 @@ async def get_user_analyses(
             detail="Authentication required. Please provide a valid API key."
         )
     
-    return await get_analysis_requests_by_user(db, UUID(user_id), skip, limit)
+    analyses = await get_analysis_requests_by_user(db, UUID(user_id))
+    return analyses
 
 
 @router.post("/{analysis_id}/run", response_model=AnalysisResult)
@@ -122,6 +121,7 @@ async def run_analysis(
     analysis_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
+    agent_system: AgentSystem = Depends(get_agent_system_dependency),
 ):
     """
     Run or re-run analysis on an existing request
@@ -152,11 +152,35 @@ async def run_analysis(
         )
     
     try:
-        # Run the analysis
-        issues = await analyze_code(db, analysis_id)
+        # Run the analysis using agent system if available
+        if agent_system and agent_system.running:
+            await analyze_code_with_agents(db, analysis_id, agent_system)
+        else:
+            # Fallback to direct analysis
+            await analyze_code_direct(db, analysis_id)
         
         # Get the updated analysis request
         updated_analysis = await get_analysis_request(db, analysis_id)
+        
+        # Get the issues
+        issues = []
+        if updated_analysis.status == "completed" and updated_analysis.result:
+            result_data = updated_analysis.result
+            if isinstance(result_data, dict):
+                raw_issues = result_data.get("issues", [])
+                for issue_data in raw_issues:
+                    if isinstance(issue_data, dict):
+                        issues.append(CodeIssue(
+                            id=issue_data.get("id", "unknown"),
+                            type=issue_data.get("type", "unknown"),
+                            message=issue_data.get("message", ""),
+                            line_start=issue_data.get("line_start", 1),
+                            line_end=issue_data.get("line_end"),
+                            column_start=issue_data.get("column_start"),
+                            column_end=issue_data.get("column_end"),
+                            code_snippet=issue_data.get("code_snippet", ""),
+                            severity=issue_data.get("severity", "medium")
+                        ))
         
         return AnalysisResult(
             request_id=analysis_id,
@@ -169,4 +193,93 @@ async def run_analysis(
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST,
             detail=str(e),
+        )
+
+
+@router.post("/quick", response_model=AnalysisResult)
+async def quick_analysis(
+    analysis_data: AnalysisRequestCreate,
+    request: Request,
+    agent_system: AgentSystem = Depends(get_agent_system_dependency),
+):
+    """
+    Perform a quick analysis without storing in database
+    
+    This endpoint uses the agent system for immediate analysis.
+    """
+    # Get user_id from request state
+    user_id = getattr(request.state, 'user_id', None)
+    if not user_id:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Please provide a valid API key."
+        )
+    
+    try:
+        # Use agent system directly for quick analysis
+        if agent_system and agent_system.running:
+            session_id = await agent_system.submit_user_request(
+                user_id=user_id,
+                code=analysis_data.code,
+                language=analysis_data.language,
+                error_message=getattr(analysis_data, 'traceback', None)
+            )
+            
+            # Wait for analysis to complete (with timeout)
+            import asyncio
+            import uuid
+            
+            coordinator = agent_system.agents.get("coordinator_1")
+            if coordinator:
+                max_wait = 30  # 30 seconds timeout
+                waited = 0
+                while waited < max_wait:
+                    session_data = coordinator.get_session_status(session_id)
+                    if session_data and session_data.get("state") in ["completed", "error"]:
+                        issues = []
+                        for issue_data in session_data.get("issues", []):
+                            issues.append(CodeIssue(
+                                id=issue_data.get("id", "unknown"),
+                                type=issue_data.get("type", "unknown"),
+                                message=issue_data.get("message", ""),
+                                line_start=issue_data.get("line_start", 1),
+                                line_end=issue_data.get("line_end"),
+                                column_start=issue_data.get("column_start"),
+                                column_end=issue_data.get("column_end"),
+                                code_snippet=issue_data.get("code_snippet", ""),
+                                severity=issue_data.get("severity", "medium")
+                            ))
+                        
+                        return AnalysisResult(
+                            request_id=uuid.UUID(session_id),
+                            status="completed" if session_data.get("state") == "completed" else "failed",
+                            issues=issues,
+                            error=session_data.get("error"),
+                        )
+                    
+                    await asyncio.sleep(1)
+                    waited += 1
+                
+                # Timeout occurred
+                raise HTTPException(
+                    status_code=HTTP_400_BAD_REQUEST,
+                    detail="Analysis timed out"
+                )
+            else:
+                raise HTTPException(
+                    status_code=HTTP_400_BAD_REQUEST,
+                    detail="Agent system coordinator not available"
+                )
+        else:
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail="Agent system not available"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail=f"Analysis failed: {str(e)}"
         ) 

@@ -12,7 +12,7 @@ import asyncio
 from app.core.config import settings
 from app.core.middleware import add_middlewares
 from app.api.v1.router import api_router
-from app.core.dependencies import get_agent_system
+from app.core.dependencies import get_agent_system, cleanup_agent_system
 
 # Configure logging
 logging.basicConfig(
@@ -38,10 +38,18 @@ async def lifespan(app: FastAPI):
     """Manage the lifespan of the application"""
     # Startup
     try:
+        # Initialize the agent system (this will start it automatically)
         agent_sys = get_agent_system()
-        # Start the agent system in the background
-        asyncio.create_task(agent_sys.start())
-        logger.info("Agent system started")
+        logger.info("Agent system initialized and starting")
+        
+        # Give the agent system a moment to start
+        await asyncio.sleep(1)
+        
+        if agent_sys.running:
+            logger.info("Agent system started successfully")
+        else:
+            logger.warning("Agent system may not have started properly")
+            
     except Exception as e:
         logger.error(f"Failed to start agent system: {str(e)}")
     
@@ -49,90 +57,69 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     try:
-        agent_sys = get_agent_system()
-        await agent_sys.stop()
+        await cleanup_agent_system()
         logger.info("Agent system stopped")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Error stopping agent system: {str(e)}")
 
-# Initialize FastAPI app
+# Create FastAPI app
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    description="AI-powered debugging service",
+    title="AgentLogger API",
+    description="AI-powered code debugging and fixing service with multi-agent architecture",
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan,
+    lifespan=lifespan
 )
 
-# Set up CORS
-cors_origins = [str(origin) for origin in settings.CORS_ORIGINS] if settings.CORS_ORIGINS else []
-
-# Add development origins if not already present
-dev_origins = [
-    "http://localhost:3000",
-    "http://localhost:5173",  # Default Vite port
-    "http://localhost:8080", 
-    "http://localhost:8081",  # Alternative Vite port
-    "http://localhost:8082",  # Current Vite port
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:8080",
-    "http://127.0.0.1:8081",
-    "http://127.0.0.1:8082",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000"
-]
-
-for origin in dev_origins:
-    if origin not in cors_origins:
-        cors_origins.append(origin)
-
-if cors_origins:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-# Add custom middleware
+# Add middlewares
 add_middlewares(app)
 
-# Add request timing middleware
-@app.middleware("http")
-async def add_process_time_header(request: Request, call_next):
-    start_time = time.time()
-    response = await call_next(request)
-    process_time = time.time() - start_time
-    response.headers["X-Process-Time"] = str(process_time)
-    logger.info(f"Request to {request.url.path} took {process_time:.3f}s")
-    return response
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include API routes
-app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(api_router)
 
 # Root endpoint
 @app.get("/")
 async def root():
-    return {"status": "ok", "message": "Welcome to AgentLogger API"}
+    """Root endpoint"""
+    return {
+        "message": "AgentLogger API",
+        "version": "0.1.0",
+        "docs": "/docs",
+        "status": "running"
+    }
 
-# Exception handlers
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    # Log the exception
-    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    try:
+        agent_sys = get_agent_system()
+        agent_status = "running" if agent_sys.running else "stopped"
+        agent_count = len(agent_sys.agents)
+    except Exception as e:
+        agent_status = f"error: {str(e)}"
+        agent_count = 0
     
-    # Capture exception in Sentry if enabled
-    if settings.SENTRY_DSN:
-        sentry_sdk.capture_exception(exc)
-    
-    # Return a generic error response
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "An internal server error occurred"},
-    )
+    return {
+        "status": "ok",
+        "timestamp": time.time(),
+        "version": "0.1.0",
+        "environment": settings.ENVIRONMENT,
+        "agent_system": {
+            "status": agent_status,
+            "agent_count": agent_count
+        }
+    }
 
 # Custom OpenAPI schema
 def custom_openapi():
@@ -140,13 +127,13 @@ def custom_openapi():
         return app.openapi_schema
     
     openapi_schema = get_openapi(
-        title=settings.PROJECT_NAME,
+        title="AgentLogger API",
         version="0.1.0",
-        description="AI-powered debugging service",
+        description="AI-powered debugging assistant with multi-agent architecture",
         routes=app.routes,
     )
     
-    # Add security scheme for API key
+    # Add API key security scheme
     openapi_schema["components"]["securitySchemes"] = {
         "ApiKeyAuth": {
             "type": "apiKey",
@@ -156,12 +143,13 @@ def custom_openapi():
     }
     
     # Apply security to all routes
-    openapi_schema["security"] = [{"ApiKeyAuth": []}]
+    for path in openapi_schema["paths"]:
+        for method in openapi_schema["paths"][path]:
+            openapi_schema["paths"][path][method]["security"] = [{"ApiKeyAuth": []}]
     
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
-# Set the custom openapi function
 app.openapi = custom_openapi
 
 if __name__ == "__main__":

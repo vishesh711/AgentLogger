@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 # Create the main API router
-api_router = APIRouter()
+api_router = APIRouter(prefix="/api/v1")
 
 # Import and include all endpoint routers
 from app.api.v1.endpoints import (
@@ -37,20 +37,14 @@ api_router.include_router(users.router, prefix="/users", tags=["users"])
 # API key management
 api_router.include_router(api_keys.router, prefix="/api-keys", tags=["api-keys"])
 
-# Code analysis
+# Core agent-powered functionality
 api_router.include_router(analyze.router, prefix="/analyze", tags=["analyze"])
-
-# Error explanation
 api_router.include_router(explain.router, prefix="/explain", tags=["explain"])
-
-# Code fixing
 api_router.include_router(fix.router, prefix="/fix", tags=["fix"])
-
-# Patch generation
 api_router.include_router(patch.router, prefix="/patch", tags=["patch"])
 
 # GitHub integration
 api_router.include_router(github.router, prefix="/github", tags=["github"])
 
-# Agent-based debugging
+# Agent debugging and testing
 api_router.include_router(agent_debug.router, prefix="/agent-debug", tags=["agent-debug"]) 
