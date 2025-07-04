@@ -4,9 +4,8 @@ from typing import Dict, Callable, Any
 from collections import defaultdict
 
 from fastapi import FastAPI, Request, Response, status
-from fastapi.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware as StarletteBaseMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
