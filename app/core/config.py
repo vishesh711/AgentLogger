@@ -29,36 +29,29 @@ class Settings(BaseSettings):
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
-        if v is None:
-            return [
-                "http://localhost",
-                "http://localhost:80", 
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost:8080"
-            ]
-        if isinstance(v, str):
-            # Handle comma-separated string
-            try:
-                return [i.strip() for i in v.split(",") if i.strip()]
-            except Exception:
-                # Fallback to default if parsing fails
-                return [
-                    "http://localhost",
-                    "http://localhost:80", 
-                    "http://localhost:3000",
-                    "http://localhost:5173",
-                    "http://localhost:8080"
-                ]
-        elif isinstance(v, list):
-            return v
-        return [
+        default_origins = [
             "http://localhost",
             "http://localhost:80", 
             "http://localhost:3000",
             "http://localhost:5173",
             "http://localhost:8080"
         ]
+        
+        if v is None or v == "":
+            return default_origins
+            
+        if isinstance(v, str):
+            # Handle comma-separated string
+            try:
+                origins = [i.strip() for i in v.split(",") if i.strip()]
+                return origins if origins else default_origins
+            except Exception:
+                # Fallback to default if parsing fails
+                return default_origins
+        elif isinstance(v, list):
+            return v if v else default_origins
+            
+        return default_origins
     
     # Environment
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")

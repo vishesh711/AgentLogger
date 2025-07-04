@@ -53,6 +53,15 @@ jobs:
         mypy app --ignore-missing-imports || true
       continue-on-error: true
     
+    - name: Run database migrations
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_agentlogger
+        SECRET_KEY: test_secret_key_for_ci_cd_testing
+        GROQ_API_KEY: test_groq_key_for_ci_cd  # Test key to prevent initialization failures
+        ENVIRONMENT: testing
+      run: |
+        alembic upgrade head
+    
     - name: Test with pytest
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_agentlogger
