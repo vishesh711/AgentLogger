@@ -2,6 +2,41 @@
 
 AgentLogger provides a comprehensive REST API for AI-powered code analysis, debugging, and fix generation. This documentation covers all available endpoints, authentication, and usage examples.
 
+## 🏗️ Architecture Overview
+
+AgentLogger uses a clear separation between **server-side** (FastAPI backend) and **client-side** (React frontend) with well-defined API contracts and authentication flows.
+
+### Quick Architecture Summary
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              CLIENT SIDE                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  React App (Port 5173/80)                                                  │
+│  ├── Authentication Context (JWT Management)                               │
+│  ├── API Client (lib/api.ts)                                              │
+│  ├── Protected Routes                                                      │
+│  └── UI Components                                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                  HTTP API Calls
+                                       │
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              SERVER SIDE                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  FastAPI Backend (Port 8000)                                              │
+│  ├── API Endpoints (/api/v1/*)                                           │
+│  ├── Authentication Middleware                                            │
+│  ├── Agent System (AI Processing)                                         │
+│  ├── Database Services                                                    │
+│  └── Background Tasks                                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**📚 For detailed architecture information, see:**
+- **[Server-Client Architecture](SERVER_CLIENT_ARCHITECTURE.md)** - Complete architectural overview
+- **[API Usage Examples](API_USAGE_EXAMPLES.md)** - Practical implementation examples
+
 ## 🚀 Quick Start
 
 ### Base URL
@@ -13,438 +48,383 @@ http://localhost/api/v1
 http://localhost:8000/api/v1
 ```
 
-### Authentication
-All API endpoints require an API key in the `X-API-Key` header:
+### Authentication Methods
 
-```bash
-curl -X POST http://localhost/api/v1/analyze \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d '{"code": "print(hello world)", "language": "python"}'
-```
+AgentLogger supports two authentication methods:
 
-### Default API Key (Testing)
+1. **JWT Tokens** (Web Interface)
+   - Used by the React frontend
+   - Header: `Authorization: Bearer {token}`
+   - Obtained via `/auth/login` endpoint
+
+2. **API Keys** (Programmatic Access)
+   - Used for external integrations
+   - Header: `X-API-Key: {api_key}`
+   - Managed via `/api-keys` endpoints
+
+### Quick Test with Default API Key
 For immediate testing, use this pre-configured key:
-```
-QwF6KA863mAeRHOCY9HJJEccV9Gp0chKTL5pogRjeOU
+```bash
+curl -X POST http://localhost/api/v1/analyze/quick \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{"code": "print(hello world)", "language": "python"}'
 ```
 
 ## 📊 Interactive Documentation
 
 AgentLogger provides interactive API documentation:
 
-- **Swagger UI**: http://localhost/docs
+- **Swagger UI**: http://localhost/docs (or http://localhost:8000/docs in dev)
 - **ReDoc**: http://localhost/redoc
 - **OpenAPI Schema**: http://localhost/api/v1/openapi.json
 
-## 🔑 API Endpoints Overview
+## 🔑 Complete API Endpoints Reference
 
-### Core Analysis Endpoints
+### Authentication & User Management
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/analyze` | POST | Analyze code for issues and bugs |
-| `/explain` | POST | Get detailed explanations of errors |
-| `/fix` | POST | Generate fixes for code issues |
-| `/patch` | POST | Create unified diff patches |
+| Endpoint | Method | Purpose | Authentication |
+|----------|--------|---------|---------------|
+| `/auth/login` | POST | User login | None |
+| `/auth/register` | POST | User registration | None |
+| `/auth/github/authorize` | GET | GitHub OAuth URL | None |
+| `/auth/google/authorize` | GET | Google OAuth URL | None |
+| `/users/me` | GET | Get current user | JWT |
+| `/users/` | GET | List users (admin) | JWT |
 
 ### API Key Management
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api-keys` | GET | List user's API keys |
-| `/api-keys` | POST | Create new API key |
-| `/api-keys/{id}` | GET | Get specific API key |
-| `/api-keys/{id}` | PUT | Update API key |
-| `/api-keys/{id}` | DELETE | Delete API key |
+| Endpoint | Method | Description | Authentication |
+|----------|--------|-------------|---------------|
+| `/api-keys/` | GET | List user's API keys | JWT |
+| `/api-keys/` | POST | Create new API key | JWT |
+| `/api-keys/{id}` | GET | Get specific API key | JWT |
+| `/api-keys/{id}` | PUT | Update API key | JWT |
+| `/api-keys/{id}` | DELETE | Delete API key | JWT |
 
-### System Endpoints
+### Core Analysis Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health/health` | GET | Health check endpoint |
-| `/agent-debug/test-full-workflow` | POST | Test agent workflow |
+| Endpoint | Method | Description | Authentication |
+|----------|--------|-------------|---------------|
+| `/analyze/quick` | POST | Quick code analysis | JWT/API Key |
+| `/analyze/` | POST | Create analysis request | JWT/API Key |
+| `/analyze/{id}` | GET | Get analysis result | JWT/API Key |
+| `/analyze/{id}/run` | POST | Run/re-run analysis | JWT/API Key |
+| `/fix/` | POST | Generate code fix | JWT/API Key |
+| `/fix/{id}` | GET | Get fix result | JWT/API Key |
+| `/explain/` | POST | Explain error message | JWT/API Key |
+
+### System & Monitoring
+
+| Endpoint | Method | Description | Authentication |
+|----------|--------|-------------|---------------|
+| `/health/` | GET | System health status | None |
+| `/agent-debug/test-full-workflow` | POST | Test agent workflow | JWT/API Key |
+| `/github/pr/{id}/status` | GET | Check PR status | JWT/API Key |
 
 ## 🔧 Core Analysis API
 
-### 1. Code Analysis
+### 1. Quick Code Analysis
 
-**POST** `/api/v1/analyze`
+**POST** `/api/v1/analyze/quick`
 
-Analyze code for syntax errors, logical bugs, and potential improvements.
+Perform immediate code analysis with real-time results.
 
-```bash
-curl -X POST http://localhost/api/v1/analyze \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d '{
-    "code": "def fibonacci(n):\n    if n <= 1:\n        return n\n    else:\n        return fibonacci(n-1) + fibonacci(n-2",
-    "language": "python"
-  }'
+**Request:**
+```json
+{
+  "code": "print(hello world)",
+  "language": "python",
+  "traceback": "SyntaxError: invalid syntax"
+}
 ```
 
 **Response:**
 ```json
 {
-  "id": "analysis-uuid",
+  "request_id": "uuid-here",
   "status": "completed",
-  "created_at": "2025-01-01T00:00:00Z",
-  "updated_at": "2025-01-01T00:00:05Z",
   "issues": [
     {
-      "type": "syntax",
-      "message": "unmatched '(' (line 4)",
-      "line_number": 4,
-      "code_snippet": "return fibonacci(n-1) + fibonacci(n-2",
-      "severity": "high"
+      "type": "syntax_error",
+      "severity": "high",
+      "message": "Missing quotes around string literal",
+      "line_start": 1,
+      "code_snippet": "print(hello world)"
     }
   ]
 }
 ```
 
-### 2. Error Explanation
-
-**POST** `/api/v1/explain`
-
-Get detailed, multi-level explanations of error messages.
-
-```bash
-curl -X POST http://localhost/api/v1/explain \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d '{
-    "code": "print(hello world)",
-    "traceback": "SyntaxError: invalid syntax",
-    "language": "python"
-  }'
+**Frontend Implementation:**
+```typescript
+// From: frontend/src/pages/Playground.tsx
+const handleAnalyze = async () => {
+  const result = await quickAnalyzeCode({
+    code: codeInput,
+    language: selectedLanguage,
+    traceback: tracebackInput
+  });
+  setAnalysisResult(result);
+};
 ```
 
-**Response:**
-```json
-{
-  "id": "explanation-uuid",
-  "explanation": "The syntax error occurs because 'hello world' is not enclosed in quotes. In Python, strings must be surrounded by quotes to be recognized as text.",
-  "created_at": "2025-01-01T00:00:00Z"
-}
-```
-
-### 3. Code Fixing
+### 2. Fix Generation
 
 **POST** `/api/v1/fix`
 
-Generate fixes for identified code issues.
+Generate AI-powered fixes for code issues.
 
-```bash
-curl -X POST http://localhost/api/v1/fix \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d '{
-    "code": "print(hello world)",
-    "traceback": "SyntaxError: invalid syntax",
-    "language": "python",
-    "analysis_id": "optional-analysis-id"
-  }'
+**Request:**
+```json
+{
+  "code": "print(hello world)",
+  "language": "python",
+  "error_message": "SyntaxError: invalid syntax",
+  "context": "Function should print greeting"
+}
 ```
 
 **Response:**
 ```json
 {
-  "id": "fix-uuid",
-  "status": "completed",
-  "fixed_code": "print(\"hello world\")",
-  "explanation": "Added quotes around the string to fix the syntax error.",
-  "created_at": "2025-01-01T00:00:00Z",
-  "updated_at": "2025-01-01T00:00:03Z"
+  "id": "fix-uuid-here",
+  "status": "pending",
+  "code": "print(hello world)",
+  "language": "python",
+  "created_at": "2024-01-01T00:00:00Z"
 }
 ```
 
-### 4. Patch Generation
+### 3. Error Explanation
 
-**POST** `/api/v1/patch`
+**POST** `/api/v1/explain`
 
-Generate unified diff patches for code fixes.
+Get detailed, level-appropriate explanations of errors.
 
-```bash
-curl -X POST http://localhost/api/v1/patch \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d '{
-    "code": "print(hello world)",
-    "traceback": "SyntaxError: invalid syntax",
-    "language": "python"
-  }'
-```
-
-## 🔑 API Key Management
-
-### 1. List API Keys
-
-**GET** `/api/v1/api-keys`
-
-Get all API keys for the current user.
-
-```bash
-curl -X GET http://localhost/api/v1/api-keys \
-  -H "X-API-Key: YOUR_API_KEY"
+**Request:**
+```json
+{
+  "error_trace": "SyntaxError: invalid syntax",
+  "code_context": "print(hello world)",
+  "language": "python",
+  "user_level": "beginner"
+}
 ```
 
 **Response:**
 ```json
-[
-  {
-    "id": "key-uuid",
-    "name": "My Development Key",
-    "description": "Key for local development",
-    "is_active": true,
-    "created_at": "2025-01-01T00:00:00Z",
-    "expires_at": null,
-    "user_id": "user-uuid"
-  }
-]
+{
+  "explanation": {
+    "simple": "You forgot to put quotes around your text",
+    "detailed": "In Python, text strings must be enclosed in quotes...",
+    "technical": "The parser expected a string literal..."
+  },
+  "learning_resources": ["python-strings-tutorial"],
+  "related_concepts": ["string literals", "syntax errors"]
+}
 ```
 
-### 2. Create API Key
+## 🔐 Authentication Examples
 
-**POST** `/api/v1/api-keys`
+### JWT Authentication (Web Interface)
 
-Create a new API key.
+```typescript
+// Frontend login flow
+const response = await login({ email, password });
+localStorage.setItem('jwt_token', response.access_token);
+
+// Subsequent API calls
+const user = await getCurrentUser(); // Automatically includes JWT token
+```
+
+### API Key Authentication (Programmatic)
 
 ```bash
+# Create API key (requires JWT)
 curl -X POST http://localhost/api/v1/api-keys \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d '{
-    "name": "Production Key",
-    "description": "Key for production deployment",
-    "expires_in_days": 365
-  }'
-```
+  -d '{"name": "My Development Key"}'
 
-**Response:**
-```json
-{
-  "key": "newly-generated-api-key",
-  "id": "key-uuid",
-  "name": "Production Key",
-  "expires_at": "2026-01-01T00:00:00Z",
-  "created_at": "2025-01-01T00:00:00Z"
-}
-```
-
-⚠️ **Important**: The `key` field is only returned once during creation.
-
-### 3. Delete API Key
-
-**DELETE** `/api/v1/api-keys/{id}`
-
-Delete an API key.
-
-```bash
-curl -X DELETE http://localhost/api/v1/api-keys/key-uuid \
-  -H "X-API-Key: YOUR_API_KEY"
-```
-
-## 🏥 System Endpoints
-
-### Health Check
-
-**GET** `/api/v1/health/health`
-
-Check system health and status.
-
-```bash
-curl -X GET http://localhost/api/v1/health/health \
-  -H "X-API-Key: YOUR_API_KEY"
-```
-
-**Response:**
-```json
-{
-  "status": "ok",
-  "timestamp": "2025-01-01T00:00:00Z",
-  "version": "0.1.0",
-  "environment": "development"
-}
-```
-
-### Agent Debug
-
-**POST** `/api/v1/agent-debug/test-full-workflow`
-
-Test the complete agent workflow system.
-
-```bash
-curl -X POST http://localhost/api/v1/agent-debug/test-full-workflow \
+# Use API key for analysis
+curl -X POST http://localhost/api/v1/analyze/quick \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d '{
-    "code": "print(hello world)",
-    "language": "python"
-  }'
+  -d '{"code": "print(hello)", "language": "python"}'
 ```
 
 ## 📝 Request/Response Schemas
 
 ### Common Request Fields
 
-```json
-{
-  "code": "string",           // Required: Code to analyze
-  "language": "string",       // Required: python, javascript
-  "traceback": "string",      // Optional: Error traceback
-  "analysis_id": "string"     // Optional: Reference to analysis
+```typescript
+interface AnalysisRequestCreate {
+  code: string;           // Required: Code to analyze
+  language: string;       // Required: python, javascript
+  traceback?: string;     // Optional: Error traceback
+}
+
+interface FixRequestCreate {
+  code: string;
+  language: string;
+  error_message?: string;
+  context?: string;
+  analysis_id?: string;
 }
 ```
 
 ### Common Response Fields
 
-```json
-{
-  "id": "string",             // Unique identifier
-  "status": "string",         // completed, failed, processing
-  "created_at": "datetime",   // ISO 8601 timestamp
-  "updated_at": "datetime"    // ISO 8601 timestamp
+```typescript
+interface AnalysisResult {
+  request_id: string;
+  status: "pending" | "completed" | "failed";
+  issues?: CodeIssue[];
+  error?: string;
+  analysis_summary?: string;
 }
-```
 
-### Error Response
-
-```json
-{
-  "detail": "Error message describing what went wrong"
+interface CodeIssue {
+  type: string;
+  severity: "low" | "medium" | "high" | "critical";
+  message: string;
+  line_start?: number;
+  line_end?: number;
+  code_snippet?: string;
 }
 ```
 
 ## 🔒 Authentication & Security
 
-### API Key Requirements
-- All endpoints require `X-API-Key` header
-- API keys are user-specific and can be managed via the web interface
-- Default testing key: `QwF6KA863mAeRHOCY9HJJEccV9Gp0chKTL5pogRjeOU`
+### JWT Token Management
+- **Lifetime**: 24 hours (configurable)
+- **Storage**: localStorage (frontend)
+- **Renewal**: Automatic refresh on valid requests
+- **Scope**: User-specific access control
+
+### API Key Features
+- **User-Specific**: Each key belongs to one user
+- **Naming**: Custom names for organization
+- **Revocation**: Instant key deletion
+- **Security**: One-time display after creation
+- **Tracking**: Last used timestamp
 
 ### Rate Limiting
-- Default: 60 requests per minute per API key
-- Rate limit headers included in responses:
-  ```
-  X-RateLimit-Limit: 60
-  X-RateLimit-Remaining: 59
-  X-RateLimit-Reset: 1609459200
-  ```
+- **Default**: 60 requests per minute per key
+- **Headers**: Rate limit info in responses
+- **Enforcement**: Middleware-level protection
 
-### CORS Support
-- Configured for common development ports
-- Production deployments should update CORS origins
+## 🔄 Data Flow Patterns
+
+### Frontend → Backend Flow
+
+1. **User Action** (e.g., click "Analyze")
+2. **Client Validation** (check inputs)
+3. **API Request** (with authentication)
+4. **Server Processing** (agent system)
+5. **Database Storage** (results)
+6. **Response** (to frontend)
+7. **UI Update** (display results)
+
+### Agent System Integration
+
+```python
+# Server-side processing flow
+@router.post("/analyze/quick")
+async def quick_analyze(
+    data: AnalysisRequestCreate,
+    request: Request,
+    agent_system: AgentSystem = Depends(get_agent_system_dependency)
+):
+    # 1. Validate authentication
+    user_id = getattr(request.state, 'user_id', None)
+    
+    # 2. Process with agent system
+    result = await agent_system.process_analysis(data, user_id)
+    
+    # 3. Return structured response
+    return result
+```
 
 ## 🚦 HTTP Status Codes
 
-| Code | Meaning |
-|------|---------|
-| 200 | Success |
-| 201 | Created |
-| 400 | Bad Request - Invalid input |
-| 401 | Unauthorized - Invalid API key |
-| 404 | Not Found |
-| 422 | Validation Error |
-| 429 | Rate Limit Exceeded |
-| 500 | Internal Server Error |
+| Code | Meaning | When It Occurs |
+|------|---------|----------------|
+| 200 | Success | Successful operation |
+| 201 | Created | Resource created (API key, user) |
+| 400 | Bad Request | Invalid input data |
+| 401 | Unauthorized | Missing/invalid authentication |
+| 403 | Forbidden | Valid auth but insufficient permissions |
+| 404 | Not Found | Resource doesn't exist |
+| 422 | Validation Error | Pydantic validation failed |
+| 429 | Rate Limited | Too many requests |
+| 500 | Server Error | Internal server error |
 
-## 💡 Usage Examples
+## 🔧 Development & Testing
 
-### Complete Workflow Example
+### Local Development Setup
 
-```python
-import requests
+```bash
+# Backend (Terminal 1)
+python -m uvicorn app.main:app --reload --port 8000
 
-# Configuration
-API_BASE = "http://localhost/api/v1"
-API_KEY = "your-api-key"
-headers = {
-    "Content-Type": "application/json",
-    "X-API-Key": API_KEY
-}
+# Frontend (Terminal 2)
+cd frontend && npm run dev
 
-# 1. Analyze code
-code = """
-def divide(a, b):
-    return a / b
-
-result = divide(10, 0)
-print(result)
-"""
-
-response = requests.post(
-    f"{API_BASE}/analyze",
-    headers=headers,
-    json={"code": code, "language": "python"}
-)
-analysis = response.json()
-print("Analysis:", analysis)
-
-# 2. Get explanation for error
-response = requests.post(
-    f"{API_BASE}/explain",
-    headers=headers,
-    json={
-        "code": code,
-        "traceback": "ZeroDivisionError: division by zero",
-        "language": "python"
-    }
-)
-explanation = response.json()
-print("Explanation:", explanation)
-
-# 3. Generate fix
-response = requests.post(
-    f"{API_BASE}/fix",
-    headers=headers,
-    json={
-        "code": code,
-        "traceback": "ZeroDivisionError: division by zero",
-        "language": "python"
-    }
-)
-fix = response.json()
-print("Fixed code:", fix["fixed_code"])
+# Test API
+curl http://localhost:8000/health
 ```
 
-### JavaScript/Frontend Example
+### Integration Testing
 
-```javascript
-const API_BASE = 'http://localhost/api/v1';
-const API_KEY = 'your-api-key';
+```bash
+# Health check
+curl http://localhost:8000/health
 
-async function analyzeCode(code, language) {
-  const response = await fetch(`${API_BASE}/analyze`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': API_KEY
-    },
-    body: JSON.stringify({ code, language })
-  });
-  
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  }
-  
-  return response.json();
-}
+# Register user
+curl -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123", "full_name": "Test User"}'
 
-// Usage
-analyzeCode('print(hello world)', 'python')
-  .then(result => console.log('Analysis result:', result))
-  .catch(error => console.error('Error:', error));
+# Login
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}'
+
+# Create API key (use JWT from login)
+curl -X POST http://localhost:8000/api/v1/api-keys \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Test Key"}'
+
+# Analyze code
+curl -X POST http://localhost:8000/api/v1/analyze/quick \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"code": "print(hello)", "language": "python"}'
 ```
 
-## 🔗 Related Documentation
+## 📚 Additional Resources
 
+### Comprehensive Documentation
+- **[Server-Client Architecture](SERVER_CLIENT_ARCHITECTURE.md)** - Detailed architectural overview
+- **[API Usage Examples](API_USAGE_EXAMPLES.md)** - Real-world implementation examples
 - **[Getting Started Guide](../guides/getting-started.md)** - Setup and basic usage
 - **[Configuration Guide](../guides/configuration.md)** - Environment configuration
 - **[Agent Architecture](../development/agent-architecture.md)** - System design details
 - **[Development Setup](../development/development-setup.md)** - Local development
 
+### Interactive Tools
+- **Swagger UI**: http://localhost/docs - Live API testing
+- **ReDoc**: http://localhost/redoc - Beautiful API documentation
+- **Playground**: http://localhost/playground - Web interface for testing
+
 ## 🆘 Support
 
 - **Interactive Docs**: http://localhost/docs for live API testing
-- **Issues**: Create GitHub issues for bugs or feature requests
-- **FAQ**: See [FAQ](../guides/faq.md) for common questions 
+- **GitHub Issues**: Report bugs or request features
+- **Architecture Docs**: [SERVER_CLIENT_ARCHITECTURE.md](SERVER_CLIENT_ARCHITECTURE.md) for detailed system design
+- **Usage Examples**: [API_USAGE_EXAMPLES.md](API_USAGE_EXAMPLES.md) for practical implementations
+
+This comprehensive API documentation ensures clear understanding of both server-side and client-side integration patterns for AgentLogger. 
