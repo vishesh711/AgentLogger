@@ -1,15 +1,17 @@
 import time
 import jwt
-from typing import Dict, Callable, Any
+from typing import Dict, List, Any, Callable
 from collections import defaultdict
 
-from fastapi import FastAPI, Request, Response, status
-from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from sqlalchemy.orm import Session
+from fastapi import FastAPI, Request, status
+from fastapi.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import JSONResponse, Response
+from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
-from app.core.db import SessionLocal
+from app.core.db import get_db, SessionLocal
+from app.models.db.api_key import ApiKey
+from app.models.db.user import User
 from app.services.api_key_service import validate_api_key
 from app.services.monitoring_service import monitoring_service
 
@@ -220,9 +222,9 @@ def add_middlewares(app: FastAPI) -> None:
     # Add API key middleware
     app.add_middleware(APIKeyMiddleware)
     
-    # Add timing middleware for debugging
+    # Add timing middleware for debugging using decorator pattern
     @app.middleware("http")
-    async def add_process_time_header(request: Request, call_next):
+    async def add_process_time_header(request: Request, call_next: Callable) -> Response:
         start_time = time.time()
         response = await call_next(request)
         process_time = time.time() - start_time

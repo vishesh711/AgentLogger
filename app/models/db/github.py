@@ -1,7 +1,8 @@
 import enum
+from typing import Optional
 
 from sqlalchemy import Column, Enum, String, Text, Integer, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped
 from sqlalchemy.sql import func
 
 from app.models.db.base import BaseModel
@@ -28,8 +29,8 @@ class GitHubPR(BaseModel):
     # Foreign keys
     fix_id = Column(String, ForeignKey("fix_requests.id"), nullable=False)
     
-    # Relationships
-    fix_request = relationship("FixRequest", back_populates="github_prs")
+    # Relationships with proper type annotations
+    fix_request: Mapped["FixRequest"] = relationship("FixRequest", back_populates="github_prs")
     
     def __repr__(self) -> str:
         return f"<GitHubPR(id='{self.id}', repo='{self.repo_name}', pr_number={self.pr_number})>" 

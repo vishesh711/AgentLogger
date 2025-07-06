@@ -2,7 +2,6 @@ from typing import Dict, List, Optional, Tuple, Any
 import json
 import os
 from datetime import datetime
-from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -24,32 +23,23 @@ CodeFix = Dict[str, Any]
 ValidationResult = Tuple[bool, Optional[str]]
 
 async def create_fix_request(
-    db: Session, 
-    fix_request: FixRequestCreate, 
-    user_id: str
-) -> FixRequestResponse:
+    db: Session, fix_data: FixRequestCreate, user_id: str, analysis_id: Optional[str] = None
+) -> FixRequest:
     """
-    Create a new fix request in the database
+    Create a new fix request
     """
-    db_fix_request = FixRequest(
+    db_fix = FixRequest(
+        language=fix_data.language,
+        code=fix_data.code,
+        error_message=fix_data.error_message,
+        context=fix_data.context,
         user_id=user_id,
-        code=fix_request.code,
-        language=fix_request.language,
-        error_message=fix_request.error_message,
-        context=fix_request.context,
-        analysis_id=fix_request.analysis_id,
-        status=FixStatus.PENDING
+        analysis_id=analysis_id,
     )
-    
-    db.add(db_fix_request)
+    db.add(db_fix)
     db.commit()
-    db.refresh(db_fix_request)
-    
-    # Start the fix process asynchronously
-    # In a real implementation, this would be a background task
-    await process_fix_request(db, db_fix_request.id)
-    
-    return FixRequestResponse.model_validate(db_fix_request)
+    db.refresh(db_fix)
+    return db_fix
 
 async def get_fix_request(db: Session, fix_id: str) -> Optional[FixRequestResponse]:
     """
@@ -71,7 +61,7 @@ async def get_user_fix_requests(db: Session, user_id: str, skip: int = 0, limit:
     
     return [FixRequestResponse.model_validate(fr) for fr in db_fix_requests]
 
-async def get_fix_requests_by_user(db: Session, user_id: UUID, skip: int = 0, limit: int = 100) -> List[FixRequestResponse]:
+async def get_fix_requests_by_user(db: Session, user_id: str, skip: int = 0, limit: int = 100) -> List[FixRequestResponse]:
     """
     Get all fix requests for a user
     
@@ -90,7 +80,7 @@ async def get_fix_requests_by_user(db: Session, user_id: UUID, skip: int = 0, li
     
     return [FixRequestResponse.model_validate(fr) for fr in db_fix_requests]
 
-async def get_fix_requests_by_analysis(db: Session, analysis_id: UUID) -> List[FixRequestResponse]:
+async def get_fix_requests_by_analysis(db: Session, analysis_id: str) -> List[FixRequestResponse]:
     """
     Get all fix requests for a specific analysis
     
@@ -183,7 +173,7 @@ async def process_fix_with_agents(db: Session, fix_request: FixRequest, agent_sy
     
     while waited_time < max_wait_time:
         # Check if the session has completed
-        session_data = coordinator.active_sessions.get(session_id)
+        session_data = getattr(coordinator, 'active_sessions', {}).get(session_id)
         if session_data and session_data.get("state") == "completed":
             # Extract fixes from the session
             fixes = session_data.get("fixes", [])
@@ -295,7 +285,7 @@ async def generate_fix(db: Session, fix_id: str) -> Dict[str, str]:
     return {
         "fixed_code": updated_fix.fixed_code or "",
         "explanation": updated_fix.explanation or "",
-        "status": updated_fix.status
+        "status": updated_fix.status.value
     }
 
 async def create_github_pr_for_fix(db: Session, fix_id: str, repo_name: str, file_path: Optional[str] = None) -> Dict[str, Any]:

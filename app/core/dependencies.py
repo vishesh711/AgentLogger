@@ -3,7 +3,7 @@ Core dependencies for dependency injection
 """
 import asyncio
 from functools import lru_cache
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Generator
 
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,7 @@ _agent_system: AgentSystem = None
 _agent_system_task: asyncio.Task = None
 
 
-def get_db() -> AsyncGenerator[Session, None]:
+def get_db() -> Generator[Session, None, None]:
     """Get database session"""
     db = SessionLocal()
     try:

@@ -21,7 +21,7 @@ class AgentSystem:
         self.llm_client = llm_client
         self.agents: Dict[str, BaseAgent] = {}
         self.logger = logging.getLogger("agent_system")
-        self.message_queue = asyncio.Queue()
+        self.message_queue: asyncio.Queue[Message] = asyncio.Queue()
         self.running = False
     
     def initialize_agents(self):

@@ -21,7 +21,7 @@ router = APIRouter()
 from app.core.dependencies import get_agent_system_dependency
 
 
-async def analyze_code_background(db: Session, analysis_id: UUID, agent_system: AgentSystem = None):
+async def analyze_code_background(db: Session, analysis_id: str, agent_system: AgentSystem = None):
     """Background task to analyze code"""
     try:
         if agent_system and agent_system.running:
@@ -54,7 +54,7 @@ async def create_analysis(
         )
     
     # Create the analysis request
-    analysis = await create_analysis_request(db, analysis_data, UUID(user_id))
+    analysis = await create_analysis_request(db, analysis_data, user_id)
     
     # Run the analysis in the background with agent system
     background_tasks.add_task(analyze_code_background, db, analysis.id, agent_system)
@@ -64,7 +64,7 @@ async def create_analysis(
 
 @router.get("/{analysis_id}", response_model=AnalysisRequestResponse)
 async def get_analysis(
-    analysis_id: UUID,
+    analysis_id: str,
     request: Request,
     db: Session = Depends(get_db),
 ):
@@ -112,13 +112,13 @@ async def get_user_analyses(
             detail="Authentication required. Please provide a valid API key."
         )
     
-    analyses = await get_analysis_requests_by_user(db, UUID(user_id))
+    analyses = await get_analysis_requests_by_user(db, user_id)
     return analyses
 
 
 @router.post("/{analysis_id}/run", response_model=AnalysisResult)
 async def run_analysis(
-    analysis_id: UUID,
+    analysis_id: str,
     request: Request,
     db: Session = Depends(get_db),
     agent_system: AgentSystem = Depends(get_agent_system_dependency),
@@ -164,27 +164,27 @@ async def run_analysis(
         
         # Get the issues
         issues = []
-        if updated_analysis.status == "completed" and updated_analysis.result:
-            result_data = updated_analysis.result
-            if isinstance(result_data, dict):
-                raw_issues = result_data.get("issues", [])
-                for issue_data in raw_issues:
-                    if isinstance(issue_data, dict):
-                        issues.append(CodeIssue(
-                            id=issue_data.get("id", "unknown"),
-                            type=issue_data.get("type", "unknown"),
-                            message=issue_data.get("message", ""),
-                            line_start=issue_data.get("line_start", 1),
-                            line_end=issue_data.get("line_end"),
-                            column_start=issue_data.get("column_start"),
-                            column_end=issue_data.get("column_end"),
-                            code_snippet=issue_data.get("code_snippet", ""),
-                            severity=issue_data.get("severity", "medium")
-                        ))
+        if updated_analysis.status == "completed" and updated_analysis.issues:
+            for issue_data in updated_analysis.issues:
+                if isinstance(issue_data, dict):
+                    issues.append(CodeIssue(
+                        id=issue_data.get("id", "unknown"),
+                        type=issue_data.get("type", "unknown"),
+                        message=issue_data.get("message", ""),
+                        line_start=issue_data.get("line_start", 1),
+                        line_end=issue_data.get("line_end"),
+                        column_start=issue_data.get("column_start"),
+                        column_end=issue_data.get("column_end"),
+                        code_snippet=issue_data.get("code_snippet", ""),
+                        severity=issue_data.get("severity", "medium")
+                    ))
+        
+        from app.models.db.analysis import AnalysisStatus
+        status_enum = AnalysisStatus.COMPLETED if updated_analysis.status == "completed" else AnalysisStatus.FAILED
         
         return AnalysisResult(
             request_id=analysis_id,
-            status=updated_analysis.status,
+            status=status_enum,
             issues=issues,
             error=updated_analysis.error,
         )
@@ -250,9 +250,12 @@ async def quick_analysis(
                                 severity=issue_data.get("severity", "medium")
                             ))
                         
+                        from app.models.db.analysis import AnalysisStatus
+                        status_enum = AnalysisStatus.COMPLETED if session_data.get("state") == "completed" else AnalysisStatus.FAILED
+                        
                         return AnalysisResult(
-                            request_id=uuid.UUID(session_id),
-                            status="completed" if session_data.get("state") == "completed" else "failed",
+                            request_id=session_id,
+                            status=status_enum,
                             issues=issues,
                             error=session_data.get("error"),
                         )

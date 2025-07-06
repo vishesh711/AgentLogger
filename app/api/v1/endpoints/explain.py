@@ -6,7 +6,7 @@ from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 from app.core.db import get_db
 from app.services.ai.groq_client import GroqClient
 from app.core.config import settings
-from app.models.schemas.explain import ErrorExplanationRequest, ErrorExplanationResponse
+from app.models.schemas.explain import ErrorExplanationRequest, ErrorExplanationResponse, ExplanationLevels, LearningResource
 
 router = APIRouter()
 
@@ -41,12 +41,15 @@ async def explain_error(
         
         # Return the explanation response
         return ErrorExplanationResponse(
-            explanation={
-                "simple": explanation.get("simple", ""),
-                "detailed": explanation.get("detailed", ""),
-                "technical": explanation.get("technical", "")
-            },
-            learning_resources=explanation.get("learning_resources", []),
+            explanation=ExplanationLevels(
+                simple=explanation.get("simple", ""),
+                detailed=explanation.get("detailed", ""),
+                technical=explanation.get("technical", "")
+            ),
+            learning_resources=[
+                LearningResource(**resource) if isinstance(resource, dict) else resource
+                for resource in explanation.get("learning_resources", [])
+            ],
             related_concepts=explanation.get("related_concepts", [])
         )
     

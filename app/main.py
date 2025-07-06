@@ -150,7 +150,8 @@ def custom_openapi():
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
-app.openapi = custom_openapi
+# Set the custom OpenAPI schema
+app.openapi_schema = custom_openapi()
 
 if __name__ == "__main__":
     import uvicorn

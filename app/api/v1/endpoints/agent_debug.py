@@ -168,7 +168,7 @@ async def test_full_workflow(
         
         while waited_time < max_wait_time:
             # Check if the session has completed
-            session_data = coordinator.active_sessions.get(session_id)
+            session_data = getattr(coordinator, 'active_sessions', {}).get(session_id)
             if session_data and session_data.get("state") == "completed":
                 # Extract results from the session
                 issues = session_data.get("issues", [])
@@ -197,7 +197,7 @@ async def test_full_workflow(
             waited_time += poll_interval
         
         # Timeout occurred - but let's see the current state
-        session_data = coordinator.active_sessions.get(session_id, {})
+        session_data = getattr(coordinator, 'active_sessions', {}).get(session_id, {})
         return {
             "status": "timeout",
             "session_id": session_id,
@@ -263,13 +263,13 @@ async def test_simple_submit(
         # Check immediate state
         await asyncio.sleep(1)  # Wait 1 second for processing to start
         
-        session_data = coordinator.active_sessions.get(session_id, {})
+        session_data = getattr(coordinator, 'active_sessions', {}).get(session_id, {})
         
         return {
             "status": "submitted",
             "session_id": session_id,
             "immediate_state": session_data,
-            "all_sessions": dict(coordinator.active_sessions),
+            "all_sessions": dict(getattr(coordinator, 'active_sessions', {})),
             "agent_system_running": agent_system.running
         }
         
@@ -364,7 +364,7 @@ async def test_message_dispatch(
             "queue_size_before": queue_size_before,
             "queue_size_after": queue_size_after,
             "message_sent": True,
-            "coordinator_sessions": dict(coordinator.active_sessions) if coordinator else "no coordinator"
+            "coordinator_sessions": dict(getattr(coordinator, 'active_sessions', {})) if coordinator else "no coordinator"
         }
         
     except Exception as e:
@@ -412,7 +412,7 @@ async def test_direct_coordinator(
             "status": "ok",
             "direct_call": True,
             "response": response.content if response else None,
-            "coordinator_sessions": dict(coordinator.active_sessions)
+            "coordinator_sessions": dict(getattr(coordinator, 'active_sessions', {}))
         }
         
     except Exception as e:
@@ -454,7 +454,7 @@ async def debug_step_by_step(
         debug_info.append(f"Step 1: Created message with content: {message.content}")
         
         # Step 2: Check initial sessions
-        initial_sessions = dict(coordinator.active_sessions)
+        initial_sessions = dict(getattr(coordinator, 'active_sessions', {}))
         debug_info.append(f"Step 2: Initial sessions count: {len(initial_sessions)}")
         
         # Step 3: Process the message
@@ -462,7 +462,7 @@ async def debug_step_by_step(
         debug_info.append(f"Step 3: Coordinator response: {response.content if response else 'None'}")
         
         # Step 4: Check sessions after processing
-        sessions_after = dict(coordinator.active_sessions)
+        sessions_after = dict(getattr(coordinator, 'active_sessions', {}))
         debug_info.append(f"Step 4: Sessions after processing: {len(sessions_after)}")
         debug_info.append(f"Step 4: Session data: {sessions_after}")
         
@@ -472,7 +472,7 @@ async def debug_step_by_step(
         
         # Step 6: Wait a bit and check again
         await asyncio.sleep(2)
-        sessions_after_wait = dict(coordinator.active_sessions)
+        sessions_after_wait = dict(getattr(coordinator, 'active_sessions', {}))
         debug_info.append(f"Step 6: Sessions after 2s wait: {len(sessions_after_wait)}")
         debug_info.append(f"Step 6: Session data after wait: {sessions_after_wait}")
         
@@ -482,6 +482,48 @@ async def debug_step_by_step(
             "final_sessions": sessions_after_wait
         }
         
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error", 
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        } 
+
+@router.post("/check-session-status")
+async def check_session_status(
+    session_id: str,
+    agent_system: AgentSystem = Depends(get_agent_system_dependency)
+):
+    """Check the status of a specific session"""
+    try:
+        # Check if the session has completed
+        coordinator = agent_system.agents.get("coordinator_1")
+        if coordinator and hasattr(coordinator, 'active_sessions'):
+            session_data = coordinator.active_sessions.get(session_id, {})
+            
+            max_wait = 30  # 30 seconds timeout
+            waited = 0
+            
+            while waited < max_wait:
+                session_data = getattr(coordinator, 'active_sessions', {}).get(session_id, {})
+                if session_data.get("state") in ["completed", "error"]:
+                    break
+                await asyncio.sleep(1)
+                waited += 1
+            
+            return {
+                "status": "ok",
+                "session_id": session_id,
+                "session_data": session_data,
+                "all_sessions": dict(getattr(coordinator, 'active_sessions', {})),
+                "waited_seconds": waited
+            }
+        else:
+            return {
+                "status": "error",
+                "error": "Coordinator not found or doesn't have active_sessions attribute"
+            }
     except Exception as e:
         import traceback
         return {

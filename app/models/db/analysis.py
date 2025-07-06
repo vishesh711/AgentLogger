@@ -1,7 +1,8 @@
 import enum
+from typing import List
 
 from sqlalchemy import Column, Enum, ForeignKey, JSON, String, Text, Boolean, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped
 from sqlalchemy.sql import func
 
 from app.models.db.base import BaseModel
@@ -37,9 +38,9 @@ class AnalysisRequest(BaseModel):
     # Foreign keys
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     
-    # Relationships
-    user = relationship("User", back_populates="analysis_requests")
-    fix_requests = relationship("FixRequest", back_populates="analysis", cascade="all, delete-orphan")
+    # Relationships with proper type annotations
+    user: Mapped["User"] = relationship("User", back_populates="analysis_requests")
+    fix_requests: Mapped[List["FixRequest"]] = relationship("FixRequest", back_populates="analysis", cascade="all, delete-orphan")
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

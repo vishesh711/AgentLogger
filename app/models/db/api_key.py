@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, ForeignKey, String, DateTime, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped
 from sqlalchemy.sql import func
 
 from app.models.db.base import BaseModel
@@ -27,8 +27,8 @@ class ApiKey(BaseModel):
     # Foreign keys - Changed from UUID to String to match users.id type
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     
-    # Relationships
-    user = relationship("User", back_populates="api_keys")
+    # Relationships with proper type annotations
+    user: Mapped["User"] = relationship("User", back_populates="api_keys")
     
     # Additional timestamps
     expires_at = Column(DateTime(timezone=True), nullable=True)

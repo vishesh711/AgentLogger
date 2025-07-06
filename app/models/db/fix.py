@@ -1,7 +1,8 @@
 import enum
+from typing import List, Optional
 
 from sqlalchemy import Column, Enum, ForeignKey, JSON, String, Text, Boolean, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped
 from sqlalchemy.sql import func
 import uuid
 
@@ -23,11 +24,11 @@ class FixRequest(BaseModel):
     
     # User who requested the fix
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
-    user = relationship("User", back_populates="fix_requests")
+    user: Mapped["User"] = relationship("User", back_populates="fix_requests")
     
     # Related analysis request - Changed from UUID to String for compatibility
     analysis_id = Column(String, ForeignKey("analysis_requests.id"), nullable=True)
-    analysis = relationship("AnalysisRequest", back_populates="fix_requests")
+    analysis: Mapped[Optional["AnalysisRequest"]] = relationship("AnalysisRequest", back_populates="fix_requests")
     
     # Code to fix
     code = Column(Text, nullable=False)
@@ -49,8 +50,8 @@ class FixRequest(BaseModel):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
     
-    # GitHub PR info
-    github_prs = relationship("GitHubPR", back_populates="fix_request", cascade="all, delete-orphan")
+    # GitHub PR info with proper type annotation
+    github_prs: Mapped[List["GitHubPR"]] = relationship("GitHubPR", back_populates="fix_request", cascade="all, delete-orphan")
     
     def __repr__(self) -> str:
         return f"<FixRequest(id='{self.id}', user_id='{self.user_id}', status='{self.status}')>" 

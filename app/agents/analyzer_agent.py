@@ -111,7 +111,7 @@ class AnalyzerAgent(BaseAgent):
     
     async def perform_static_analysis(self, code: str, language: str) -> List[Dict[str, Any]]:
         """Perform static analysis on the code using language-specific parsers."""
-        issues = []
+        issues: List[Dict[str, Any]] = []
         
         try:
             # Get the appropriate parser for the language
@@ -142,7 +142,7 @@ class AnalyzerAgent(BaseAgent):
     
     async def analyze_error_message(self, code: str, language: str, error_message: str) -> List[Dict[str, Any]]:
         """Analyze an error message to identify issues."""
-        issues = []
+        issues: List[Dict[str, Any]] = []
         
         # Extract line numbers from error message if possible
         line_number = self.extract_line_number(error_message)
@@ -160,7 +160,7 @@ class AnalyzerAgent(BaseAgent):
     
     async def execute_code(self, code: str, language: str) -> List[Dict[str, Any]]:
         """Execute the code in a sandbox to identify runtime issues."""
-        issues = []
+        issues: List[Dict[str, Any]] = []
         
         if not self.code_runner:
             return issues
@@ -187,7 +187,7 @@ class AnalyzerAgent(BaseAgent):
     
     async def identify_issues_with_llm(self, code: str, language: str, error_message: Optional[str]) -> List[Dict[str, Any]]:
         """Use LLM to identify issues in the code."""
-        issues = []
+        issues: List[Dict[str, Any]] = []
         
         try:
             # Use the Groq client's analyze_code method which is properly designed
@@ -249,7 +249,7 @@ Only respond with the JSON array, no other text.
     
     def parse_llm_response(self, response: str) -> List[Dict[str, Any]]:
         """Parse the LLM response to extract issues."""
-        issues = []
+        issues: List[Dict[str, Any]] = []
         
         try:
             # Try to extract JSON from the response

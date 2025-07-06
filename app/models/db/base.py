@@ -19,4 +19,4 @@ class BaseModel(Base):
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert model to dictionary"""
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns} 
+        return {c.name: getattr(self, c.name) for c in self.__class__.__table__.columns} 

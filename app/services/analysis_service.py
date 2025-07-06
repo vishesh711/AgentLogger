@@ -1,5 +1,4 @@
 from typing import List, Optional
-from uuid import UUID
 import asyncio
 
 from sqlalchemy.orm import Session
@@ -11,7 +10,7 @@ from app.utils.parsing.parser_factory import get_parser_for_language
 
 
 async def create_analysis_request(
-    db: Session, analysis_data: AnalysisRequestCreate, user_id: UUID
+    db: Session, analysis_data: AnalysisRequestCreate, user_id: str
 ) -> AnalysisRequest:
     """
     Create a new analysis request
@@ -27,14 +26,14 @@ async def create_analysis_request(
     return db_analysis
 
 
-async def get_analysis_request(db: Session, analysis_id: UUID) -> Optional[AnalysisRequest]:
+async def get_analysis_request(db: Session, analysis_id: str) -> Optional[AnalysisRequest]:
     """
     Get an analysis request by ID
     """
     return db.query(AnalysisRequest).filter(AnalysisRequest.id == analysis_id).first()
 
 
-async def get_analysis_requests_by_user(db: Session, user_id: UUID, skip: int = 0, limit: int = 100) -> List[AnalysisRequest]:
+async def get_analysis_requests_by_user(db: Session, user_id: str, skip: int = 0, limit: int = 100) -> List[AnalysisRequest]:
     """
     Get all analysis requests for a user
     """
@@ -48,7 +47,7 @@ async def get_analysis_requests_by_user(db: Session, user_id: UUID, skip: int = 
     )
 
 
-async def analyze_code_with_agents(db: Session, analysis_id: UUID, agent_system) -> List[CodeIssue]:
+async def analyze_code_with_agents(db: Session, analysis_id: str, agent_system) -> List[CodeIssue]:
     """
     Analyze code using the multi-agent system
     """
@@ -58,7 +57,7 @@ async def analyze_code_with_agents(db: Session, analysis_id: UUID, agent_system)
         raise ValueError(f"Analysis request with ID {analysis_id} not found")
     
     # Update status to processing
-    analysis.status = AnalysisStatus.PROCESSING
+    analysis.status = AnalysisStatus.PROCESSING.value
     db.commit()
     
     try:
@@ -86,28 +85,28 @@ async def analyze_code_with_agents(db: Session, analysis_id: UUID, agent_system)
         
         while waited_time < max_wait_time:
             # Check if the session has completed
-            session_data = coordinator.active_sessions.get(session_id)
+            session_data = getattr(coordinator, 'active_sessions', {}).get(session_id)
             if session_data and session_data.get("state") == "completed":
                 # Extract issues from the session
                 issues = session_data.get("issues", [])
                 
                 # Convert to CodeIssue objects
                 code_issues = []
-                for issue in issues:
+                for i, issue in enumerate(issues):
                     code_issues.append(CodeIssue(
+                        id=f"issue_{i}",
                         type=issue.get("type", "unknown"),
                         message=issue.get("message", ""),
                         line_start=issue.get("line_start", 1),
                         line_end=issue.get("line_end"),
                         column_start=issue.get("column_start"),
                         column_end=issue.get("column_end"),
-                        severity=issue.get("severity", "medium"),
-                        confidence=issue.get("confidence", 0.5)
+                        severity=issue.get("severity", "medium")
                     ))
                 
                 # Update the analysis request with the issues
                 analysis.issues = [issue.dict() for issue in code_issues]
-                analysis.status = AnalysisStatus.COMPLETED
+                analysis.status = AnalysisStatus.COMPLETED.value
                 db.commit()
                 
                 return code_issues
@@ -115,7 +114,7 @@ async def analyze_code_with_agents(db: Session, analysis_id: UUID, agent_system)
             elif session_data and session_data.get("state") == "error":
                 # Analysis failed
                 error_msg = session_data.get("error", "Unknown error occurred")
-                analysis.status = AnalysisStatus.FAILED
+                analysis.status = AnalysisStatus.FAILED.value
                 analysis.error = error_msg
                 db.commit()
                 raise Exception(error_msg)
@@ -125,21 +124,21 @@ async def analyze_code_with_agents(db: Session, analysis_id: UUID, agent_system)
             waited_time += poll_interval
         
         # Timeout occurred
-        analysis.status = AnalysisStatus.FAILED
+        analysis.status = AnalysisStatus.FAILED.value
         analysis.error = "Analysis timed out"
         db.commit()
         raise Exception("Analysis timed out after 60 seconds")
         
     except Exception as e:
         # Update status to failed
-        analysis.status = AnalysisStatus.FAILED
+        analysis.status = AnalysisStatus.FAILED.value
         analysis.error = str(e)
         db.commit()
         
         raise e
 
 
-async def analyze_code(db: Session, analysis_id: UUID, agent_system=None) -> List[CodeIssue]:
+async def analyze_code(db: Session, analysis_id: str, agent_system=None) -> List[CodeIssue]:
     """
     Analyze code for bugs and issues using agent system or fallback to direct LLM
     """
@@ -151,7 +150,7 @@ async def analyze_code(db: Session, analysis_id: UUID, agent_system=None) -> Lis
         return await analyze_code_direct(db, analysis_id)
 
 
-async def analyze_code_direct(db: Session, analysis_id: UUID) -> List[CodeIssue]:
+async def analyze_code_direct(db: Session, analysis_id: str) -> List[CodeIssue]:
     """
     Analyze code directly using LLM (fallback method)
     """
@@ -161,7 +160,7 @@ async def analyze_code_direct(db: Session, analysis_id: UUID) -> List[CodeIssue]
         raise ValueError(f"Analysis request with ID {analysis_id} not found")
     
     # Update status to processing
-    analysis.status = AnalysisStatus.PROCESSING
+    analysis.status = AnalysisStatus.PROCESSING.value
     db.commit()
     
     try:
@@ -180,14 +179,14 @@ async def analyze_code_direct(db: Session, analysis_id: UUID) -> List[CodeIssue]
         
         # Update the analysis request with the issues
         analysis.issues = [issue.dict() for issue in processed_issues]
-        analysis.status = AnalysisStatus.COMPLETED
+        analysis.status = AnalysisStatus.COMPLETED.value
         db.commit()
         
         return processed_issues
     
     except Exception as e:
         # Update status to failed
-        analysis.status = AnalysisStatus.FAILED
+        analysis.status = AnalysisStatus.FAILED.value
         analysis.error = str(e)
         db.commit()
         

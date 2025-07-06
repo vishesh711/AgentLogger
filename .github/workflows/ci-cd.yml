@@ -84,8 +84,13 @@ jobs:
       run: |
         pytest tests/ -v --tb=short
     
+    - name: Check frontend dependencies
+      run: |
+        ls -la frontend/
+        test -f frontend/package-lock.json && echo "package-lock.json found" || echo "package-lock.json not found"
+    
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
