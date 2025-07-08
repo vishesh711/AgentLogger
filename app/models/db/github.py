@@ -1,9 +1,13 @@
 import enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Column, String, Integer, ForeignKey
 from sqlalchemy.orm import relationship, Mapped
 
 from app.models.db.base import BaseModel
+
+if TYPE_CHECKING:
+    from app.models.db.fix import FixRequest
 
 
 class PRStatus(enum.Enum):

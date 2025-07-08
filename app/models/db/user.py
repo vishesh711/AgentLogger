@@ -1,8 +1,13 @@
-from typing import List
+from typing import List, TYPE_CHECKING
 from sqlalchemy import Column, String, Boolean, DateTime
 from sqlalchemy.orm import relationship, Mapped
 
 from app.models.db.base import BaseModel
+
+if TYPE_CHECKING:
+    from app.models.db.api_key import ApiKey
+    from app.models.db.fix import FixRequest
+    from app.models.db.analysis import AnalysisRequest
 
 
 class User(BaseModel):

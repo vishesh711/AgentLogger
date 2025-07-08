@@ -9,14 +9,17 @@
       }
     },
     {
-      "src": "api/index.py",
-      "use": "@vercel/python"
+      "src": "api/vercel_app.py",
+      "use": "@vercel/python",
+      "config": {
+        "pythonRequirements": "api/requirements-vercel.txt"
+      }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/index.py"
+      "dest": "/api/vercel_app.py"
     },
     {
       "src": "/(.*)",
@@ -27,10 +30,13 @@
   "outputDirectory": "frontend/dist",
   "env": {
     "ENVIRONMENT": "production",
-    "VITE_API_URL": "https://agentlogger.vercel.app/api/v1"
+    "VITE_API_URL": "https://agentlogger.vercel.app/api/v1",
+    "USE_DOCKER_SANDBOX": "false",
+    "USE_REDIS": "false",
+    "ENABLE_ANALYTICS": "false"
   },
   "functions": {
-    "api/index.py": {
+    "api/vercel_app.py": {
       "memory": 1024,
       "maxDuration": 30
     }

@@ -1,11 +1,16 @@
 import enum
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from sqlalchemy import Column, Enum, ForeignKey, String, Text, DateTime
 from sqlalchemy.orm import relationship, Mapped
 from sqlalchemy.sql import func
 
 from app.models.db.base import BaseModel
+
+if TYPE_CHECKING:
+    from app.models.db.user import User
+    from app.models.db.analysis import AnalysisRequest
+    from app.models.db.github import GitHubPR
 
 
 class FixStatus(enum.Enum):
