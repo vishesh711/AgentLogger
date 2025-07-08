@@ -1,20 +1,14 @@
 from typing import Dict, List, Optional, Tuple, Any
-import json
-import os
 from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.db.analysis import AnalysisRequest
 from app.models.db.fix import FixRequest, FixStatus
-from app.models.schemas.analysis import CodeIssue
 from app.models.schemas.fix import (
     FixRequestCreate, 
-    FixRequestResponse, 
-    FixRequestUpdate
+    FixRequestResponse
 )
-from app.services.ai.groq_client import GroqClient, get_fix_from_groq
-from app.services.analysis_service import get_analysis_request
+from app.services.ai.groq_client import get_fix_from_groq
 from app.utils.parsing.parser_factory import get_parser_for_language
 from app.utils.sandbox.code_runner import run_code_in_sandbox
 

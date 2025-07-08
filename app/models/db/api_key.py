@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Column, ForeignKey, String, DateTime, Text
 from sqlalchemy.orm import relationship, Mapped
-from sqlalchemy.sql import func
 
 from app.models.db.base import BaseModel
 

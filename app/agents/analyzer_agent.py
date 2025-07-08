@@ -1,10 +1,9 @@
 """
 Analyzer Agent for analyzing code and identifying issues.
 """
-import asyncio
 import json
 import uuid
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from app.agents.base_agent import BaseAgent, Message
 from app.services.ai.groq_client import GroqClient

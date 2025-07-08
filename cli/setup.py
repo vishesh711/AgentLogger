@@ -11,7 +11,7 @@ setup(
     long_description_content_type="text/markdown",
     author="AgentLogger Team",
     author_email="info@agentlogger.ai",
-    url="https://github.com/yourusername/agentlogger",
+    url="https://github.com/AgentLogger/AgentLogger",
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
@@ -50,8 +50,8 @@ setup(
     python_requires=">=3.8",
     keywords="cli, code-analysis, debugging, ai, linting",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/agentlogger/issues",
+        "Bug Reports": "https://github.com/AgentLogger/AgentLogger/issues",
         "Documentation": "https://agentlogger.com/docs",
-        "Source": "https://github.com/yourusername/agentlogger",
+        "Source": "https://github.com/AgentLogger/AgentLogger",
     },
 ) 

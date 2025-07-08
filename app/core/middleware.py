@@ -1,17 +1,14 @@
 import time
 import jwt
-from typing import Dict, List, Any, Callable
+from typing import Dict, Callable
 from collections import defaultdict
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse, Response
-from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
-from app.core.db import get_db, SessionLocal
-from app.models.db.api_key import ApiKey
-from app.models.db.user import User
+from app.core.db import SessionLocal
 from app.services.api_key_service import validate_api_key
 from app.services.monitoring_service import monitoring_service
 
@@ -133,7 +130,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
                 if user_id:
                     request.state.user_id = user_id
                     return await call_next(request)
-            except jwt.PyJWTError as e:
+            except jwt.PyJWTError:
                 pass  # Fall back to API key authentication
         
         # Fall back to API key authentication

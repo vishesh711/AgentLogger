@@ -3,7 +3,7 @@ Core dependencies for dependency injection
 """
 import asyncio
 from functools import lru_cache
-from typing import AsyncGenerator, Generator
+from typing import Generator
 
 from sqlalchemy.orm import Session
 

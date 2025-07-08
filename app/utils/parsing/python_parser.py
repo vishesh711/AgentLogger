@@ -1,6 +1,6 @@
 import ast
 import re
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 
 from app.models.schemas.analysis import CodeIssue
 from app.utils.parsing.base_parser import BaseParser

@@ -4,7 +4,7 @@ Agent System for managing all agents and their communication.
 import asyncio
 import logging
 import uuid
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional
 
 from app.agents.base_agent import BaseAgent, Message
 from app.agents.coordinator_agent import CoordinatorAgent

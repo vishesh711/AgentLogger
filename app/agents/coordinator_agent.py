@@ -1,7 +1,6 @@
 """
 Coordinator Agent for orchestrating multi-agent debugging workflows.
 """
-import asyncio
 import uuid
 from typing import Dict, Any, Optional, List
 from datetime import datetime

@@ -1,14 +1,11 @@
 from datetime import datetime, timedelta
-from typing import Optional, List, Union
-from uuid import UUID
+from typing import Optional, List
 import secrets
 
 from sqlalchemy.orm import Session
 
 from app.models.db.api_key import ApiKey
-from app.models.db.user import User
 from app.models.schemas.api_key import ApiKeyCreate, ApiKeyResponse, ApiKeyUpdate
-from app.core.db import get_db
 
 
 async def validate_api_key(api_key: str, db: Optional[Session] = None) -> Optional[str]:

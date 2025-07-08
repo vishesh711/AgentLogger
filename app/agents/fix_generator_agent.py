@@ -1,10 +1,9 @@
 """
 Fix Generator Agent for generating fixes for identified issues.
 """
-import asyncio
 import json
 import uuid
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional
 
 from app.agents.base_agent import BaseAgent, Message
 from app.services.ai.groq_client import GroqClient

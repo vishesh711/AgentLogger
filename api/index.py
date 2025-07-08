@@ -13,13 +13,8 @@ os.environ.setdefault("ENVIRONMENT", "production")
 # Import the main FastAPI app
 from app.main import app
 
-# For Vercel serverless functions, we need to handle the app directly
+# For Vercel serverless functions, we need to export the app directly
 # The app is already configured with all routes and middleware in app.main
-# We don't need to create a new app or mount anything
 
-# Export the app as the handler
-def handler(request, context):
-    return app(request, context)
-
-# Also export as 'app' for compatibility
-__all__ = ["app", "handler"]
+# Export the app for Vercel
+__all__ = ["app"]

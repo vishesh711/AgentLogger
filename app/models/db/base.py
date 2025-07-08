@@ -1,6 +1,5 @@
 import uuid
 from typing import Dict, Any
-from datetime import datetime
 from sqlalchemy import Column, String, DateTime
 from sqlalchemy.sql import func
 

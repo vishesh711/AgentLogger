@@ -20,7 +20,6 @@ from app.core.db import Base
 target_metadata = Base.metadata
 
 # Import all models to ensure they are registered with the metadata
-from app.models.db import BaseModel, User, ApiKey, AnalysisRequest, FixRequest, GitHubPR
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

@@ -87,22 +87,20 @@ jobs:
     - name: Check frontend dependencies
       run: |
         ls -la frontend/
-        test -f frontend/package-lock.json && echo "package-lock.json found" || echo "package-lock.json not found"
+        test -f frontend/bun.lockb && echo "bun.lockb found" || echo "bun.lockb not found"
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
       with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: 'frontend/package-lock.json'
+        bun-version: latest
     
     - name: Test frontend build
       run: |
         cd frontend
-        npm ci
-        npm run build
+        bun install --frozen-lockfile
+        bun run build
         # Skip type-check for now due to potential issues
-        # npm run type-check
+        # bun run type-check
 
   test-docker:
     runs-on: ubuntu-latest

@@ -86,7 +86,7 @@ exec gunicorn app.main:app \\\n\
 RUN chown -R app:app /app
 
 # Add health check
-RUN echo '#!/bin/bash\ncurl -f http://localhost:${PORT:-8000}/api/v1/health || exit 1' > /app/healthcheck-prod.sh && \
+RUN echo '#!/bin/bash\ncurl -f http://localhost:${PORT:-8000}/health || exit 1' > /app/healthcheck-prod.sh && \
     chmod +x /app/healthcheck-prod.sh && \
     chown app:app /app/healthcheck-prod.sh
 

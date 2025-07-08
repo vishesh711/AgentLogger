@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
@@ -8,11 +8,10 @@ from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 from app.core.db import get_db
 from app.models.schemas.fix import FixRequestCreate, FixRequestResponse, FixResult
 from app.services.fix_service import (
-    create_fix_request, get_fix_request, 
+    get_fix_request, 
     get_fix_requests_by_user, get_fix_requests_by_analysis,
     generate_fix, process_fix_with_agents, process_fix_direct
 )
-from app.services.github_service import create_github_pr
 from app.agents.agent_system import AgentSystem
 from app.core.dependencies import get_agent_system_dependency
 

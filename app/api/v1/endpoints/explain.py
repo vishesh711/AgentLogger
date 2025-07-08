@@ -1,11 +1,9 @@
-from typing import Dict, Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
+from starlette.status import HTTP_400_BAD_REQUEST
 
 from app.core.db import get_db
 from app.services.ai.groq_client import GroqClient
-from app.core.config import settings
 from app.models.schemas.explain import ErrorExplanationRequest, ErrorExplanationResponse, ExplanationLevels, LearningResource
 
 router = APIRouter()

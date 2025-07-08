@@ -3,10 +3,9 @@ Base agent class that all specialized agents will inherit from.
 """
 from abc import ABC, abstractmethod
 import asyncio
-import json
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union, Callable
+from typing import Any, Dict, Optional, Callable
 
 class Message:
     """

@@ -84,7 +84,7 @@ def init_db(db: Session) -> None:
         db.commit()
         db.refresh(api_key)
         
-        print(f"\n" + "="*60)
+        print("\n" + "="*60)
         print("🎉 API Key Generated Successfully!")
         print("="*60)
         print(f"API Key: {raw_api_key}")

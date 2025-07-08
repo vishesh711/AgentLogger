@@ -1,7 +1,6 @@
 from typing import List
-from sqlalchemy import Column, String, Boolean, DateTime, Text
+from sqlalchemy import Column, String, Boolean, DateTime
 from sqlalchemy.orm import relationship, Mapped
-from sqlalchemy.sql import func
 
 from app.models.db.base import BaseModel
 

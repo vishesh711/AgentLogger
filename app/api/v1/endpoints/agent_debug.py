@@ -1,12 +1,11 @@
 """
 API endpoints for agent-based debugging.
 """
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import Dict, Any, Optional
+from typing import Optional
 import uuid
 import asyncio
-import time
 
 from app.core.db import get_db
 from app.core.dependencies import get_agent_system_dependency
@@ -336,7 +335,6 @@ async def test_message_dispatch(
     """Test if message dispatching is working"""
     try:
         from app.agents.base_agent import Message
-        import uuid
         
         # Create a test message
         test_message = Message(

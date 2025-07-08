@@ -8,7 +8,6 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.core.db import Base, get_db
-from app.models.db import user, api_key, analysis, fix, github
 
 # Test database URL - use in-memory SQLite for tests
 TEST_DATABASE_URL = os.environ.get(
@@ -99,7 +98,6 @@ def test_user(db_session):
 def test_api_key(db_session, test_user):
     """Create a test API key"""
     from app.models.db.api_key import APIKey
-    import secrets
     
     api_key = APIKey(
         key="test-api-key-for-testing",

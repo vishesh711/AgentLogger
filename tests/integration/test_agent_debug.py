@@ -1,10 +1,7 @@
 """
 Test script for the agent-based debugging system.
 """
-import json
 import requests
-import time
-from typing import Dict, Any
 import pytest
 import os
 

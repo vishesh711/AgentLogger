@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 import os
-import sys
-import json
 import argparse
 import configparser
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Optional
 
 import httpx
 

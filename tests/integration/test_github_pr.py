@@ -1,6 +1,5 @@
 import requests
 import sys
-import os
 
 # Replace with your API key
 API_KEY = "your_api_key_here"  # Replace with the key generated earlier
@@ -117,7 +116,7 @@ if __name__ == "__main__":
     pr_data = create_github_pr(code, repo, branch)
     
     if pr_data:
-        print(f"\nSuccessfully created PR!")
+        print("\nSuccessfully created PR!")
         print(f"PR URL: {pr_data.get('url')}")
         print(f"PR Number: {pr_data.get('number')}")
     else:

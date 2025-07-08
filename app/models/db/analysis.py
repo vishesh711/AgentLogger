@@ -1,7 +1,7 @@
 import enum
 from typing import List
 
-from sqlalchemy import Column, Enum, ForeignKey, JSON, String, Text, Boolean, DateTime
+from sqlalchemy import Column, ForeignKey, JSON, String, Text, DateTime
 from sqlalchemy.orm import relationship, Mapped
 from sqlalchemy.sql import func
 

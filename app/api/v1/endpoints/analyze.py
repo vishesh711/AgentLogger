@@ -1,5 +1,4 @@
 from typing import List
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
@@ -11,7 +10,7 @@ from app.models.schemas.analysis import (
 )
 from app.services.analysis_service import (
     create_analysis_request, get_analysis_request, 
-    get_analysis_requests_by_user, analyze_code_with_agents, analyze_code_direct, analyze_code
+    get_analysis_requests_by_user, analyze_code_with_agents, analyze_code_direct
 )
 from app.agents.agent_system import AgentSystem
 
@@ -227,7 +226,6 @@ async def quick_analysis(
             
             # Wait for analysis to complete (with timeout)
             import asyncio
-            import uuid
             
             coordinator = agent_system.agents.get("coordinator_1")
             if coordinator:

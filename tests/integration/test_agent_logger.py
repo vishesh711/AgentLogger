@@ -1,7 +1,6 @@
 import requests
 import time
 import sys
-import os
 
 # Replace with your API key
 API_KEY = "your_api_key_here"  # Replace with the key generated earlier
