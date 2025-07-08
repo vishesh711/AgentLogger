@@ -142,6 +142,22 @@ docker-compose -f docker-compose.prod.yml up -d
 ./docs/deployment/deploy-vercel.sh
 ```
 
+### Vercel Deployment Setup
+
+To set up Vercel deployment for this project, you need to add the following secrets to your GitHub repository:
+
+1. `VERCEL_TOKEN`: Your Vercel API token (get from Vercel account settings)
+2. `VERCEL_ORG_ID`: Your Vercel organization ID
+3. `VERCEL_PROJECT_ID`: Your Vercel project ID
+
+You can find the organization and project IDs in your Vercel project settings or by running:
+
+```bash
+vercel link
+```
+
+The deployment uses a simplified API for Vercel in `api/vercel_app.py` to ensure compatibility with Vercel's serverless environment.
+
 ## 📚 API Documentation
 
 The API documentation is available at:

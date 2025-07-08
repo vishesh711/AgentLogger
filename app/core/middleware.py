@@ -4,7 +4,7 @@ from typing import Dict, Callable
 from collections import defaultdict
 
 from fastapi import FastAPI, Request, status
-from fastapi.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from app.core.config import settings
