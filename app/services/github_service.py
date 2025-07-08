@@ -229,9 +229,9 @@ async def create_github_pr_record(
     return db_pr
 
 
-async def create_github_pr(db: Session, fix_id: UUID) -> str:
+async def create_github_pr_from_record(db: Session, fix_id: UUID) -> str:
     """
-    Create a GitHub PR with the fix
+    Create a GitHub PR with the fix using database record
     """
     # Get the fix request
     fix = await get_fix_request(db, fix_id)

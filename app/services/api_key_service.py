@@ -248,7 +248,7 @@ def verify_api_key_service(db: Session, api_key: str) -> Optional[str]:
     """
     db_api_key = db.query(ApiKey).filter(
         ApiKey.key == api_key,
-        ApiKey.is_active == True
+        ApiKey.is_active
     ).first()
     
     if not db_api_key:

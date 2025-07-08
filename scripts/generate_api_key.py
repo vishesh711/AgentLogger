@@ -40,18 +40,6 @@ def generate_api_key():
         now = datetime.utcnow()
         expires_at = now + timedelta(days=365)  # 1 year expiration
         
-        # Create API key
-        api_key = ApiKey(
-            key=raw_api_key,
-            name="Test API Key",
-            description="Generated for testing purposes",
-            user_id=admin_user.id,
-            expires_at=expires_at,
-            is_active=True,
-            created_at=now,
-            updated_at=now
-        )
-        
         # Use raw SQL to insert the API key
         from sqlalchemy import text
         query = text("""

@@ -238,7 +238,6 @@ def create_diff(original_code: str, fixed_code: str) -> str:
     """
     # In a real implementation, use a proper diff library
     # This is a simplified version
-    parser = get_parser_for_language("python")  # Default to Python parser
     
     # Parse both code versions
     original_lines = original_code.splitlines()
