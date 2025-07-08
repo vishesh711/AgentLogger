@@ -187,3 +187,26 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Integration with more IDEs
 - [ ] Advanced debugging features
 - [ ] Performance optimizations
+
+## CI/CD and Deployment
+
+### GitHub Actions CI/CD
+
+The project uses GitHub Actions for continuous integration and deployment:
+
+- **CI/CD Pipeline**: Runs tests, linting, and builds Docker images on each push to main and pull requests
+- **Vercel Deployment**: Automatically deploys the frontend and API to Vercel when CI passes
+
+### Vercel Deployment
+
+The project is set up for deployment on Vercel with the following configuration:
+
+- **Frontend**: Built with Bun and deployed as a static site
+- **API**: Deployed as a serverless function using the Python runtime
+- **Environment**: Production environment variables are configured in Vercel
+
+To set up Vercel deployment:
+
+1. Create a Vercel project and link it to your GitHub repository
+2. Add the `VERCEL_TOKEN` secret to your GitHub repository
+3. Configure environment variables in Vercel dashboard
