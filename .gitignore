@@ -436,3 +436,9 @@ build/
 # Backup files
 *.backup
 *.bak
+
+# Ensure frontend directory is not ignored
+!frontend/
+!frontend/package.json
+!frontend/dist/
+!frontend/dist/index.html

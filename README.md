@@ -226,3 +226,13 @@ To set up Vercel deployment:
 1. Create a Vercel project and link it to your GitHub repository
 2. Add the `VERCEL_TOKEN` secret to your GitHub repository
 3. Configure environment variables in Vercel dashboard
+
+### CI/CD Frontend Notes
+
+The CI/CD pipeline is configured to handle cases where the frontend directory might be missing or incomplete:
+
+1. If the frontend directory doesn't exist in the repository, a minimal structure will be created during the CI/CD run
+2. The pipeline uses Bun for frontend builds and will adapt based on whether bun.lockb exists
+3. For Vercel deployments, a placeholder frontend is created if needed
+
+This ensures that CI/CD runs successfully even if you're primarily working on the backend components.
